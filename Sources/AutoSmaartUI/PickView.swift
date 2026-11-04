@@ -15,7 +15,7 @@ public struct PickView: View {
             Text(PassPresenter.pickSupporting).font(.custom("Inter", size: 13)).foregroundStyle(Theme.secondary)
             HStack(alignment: .top, spacing: ThemeMetrics.groupGap) {
                 matrixTable
-                curveTable
+                curveList
             }
             Spacer()
         }
@@ -45,28 +45,26 @@ public struct PickView: View {
         }
     }
 
-    private var curveTable: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header("Curve", "Type", "Source")
+    private var curveList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Curve")
+                .font(.custom("Inter", size: 11).weight(.medium))
+                .tracking(0.88)
+                .foregroundStyle(Theme.lightGold)
+                .frame(height: ThemeMetrics.row, alignment: .leading)
             ForEach(controller.state.presets, id: \.name) { preset in
                 Button { controller.recall(name: preset.name) } label: {
-                    HStack {
-                        Text(preset.name).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(PassPresenter.kindLabel(preset.kind)).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(curveSource(preset)).frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .font(.custom("Inter", size: 13))
-                    .frame(height: ThemeMetrics.row)
-                    .background(controller.state.passPresetName == preset.name ? Theme.selectedRow : Color.clear)
+                    CurveThumb(
+                        points: preset.points,
+                        selected: controller.state.passPresetName == preset.name,
+                        // Built-in shapes are distinct; only label bank/stored curves.
+                        label: BuiltInTargets.names.contains(preset.name) ? nil : preset.name
+                    )
                 }
                 .buttonStyle(.plain)
             }
         }
-    }
-
-    private func curveSource(_ preset: CurvePreset) -> String {
-        if BuiltInTargets.names.contains(preset.name) { return "Built-in" }
-        return preset.kind == .target ? "Stored target" : "Captured trace"
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func header(_ a: String, _ b: String, _ c: String) -> some View {

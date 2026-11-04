@@ -45,6 +45,8 @@ final class ShellTests: XCTestCase {
         XCTAssertEqual(pass.state.step, .delay)
         let plot = MagnitudePlot(before: [point], after: nil)
         _ = plot.body
+        let thumb = CurveThumb(points: BuiltInTargets.presets[0].points, selected: true)
+        _ = thumb.body
     }
 
     func testUISourceDoesNotHardcodeTheDraftNumbers() throws {
