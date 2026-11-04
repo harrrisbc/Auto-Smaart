@@ -363,4 +363,50 @@ extension PassController {
     }
 }
 
+extension PassController {
+    public func undoDelay() {
+        guard let output = state.selectedOutput, let snapshot = state.outputs[output - 1].delaySnapshot else { return }
+        let addresses: (delay: String, fineDelay: String)
+        do { addresses = try delayAddresses(output: output) } catch { return }
+        sendUndo([
+            Replacement(address: addresses.delay, value: snapshot.delay),
+            Replacement(address: addresses.fineDelay, value: snapshot.fineDelay)
+        ])
+    }
+
+    public func undoLastWrite() {
+        guard let output = state.selectedOutput else { return }
+        let lastWrite = state.outputs[output - 1].lastWrite
+        var items: [Replacement] = []
+        if let snapshot = state.outputs[output - 1].delaySnapshot, let addresses = try? delayAddresses(output: output) {
+            items.append(Replacement(address: addresses.delay, value: snapshot.delay))
+            items.append(Replacement(address: addresses.fineDelay, value: snapshot.fineDelay))
+        }
+        for band in (state.outputs[output - 1].eqSnapshot ?? []).sorted(by: { $0.index < $1.index }) {
+            guard let addresses = try? eqAddresses(output: output, band: band.index) else { continue }
+            items.append(Replacement(address: addresses.freq, value: band.freq))
+            items.append(Replacement(address: addresses.gain, value: band.gain))
+            items.append(Replacement(address: addresses.q, value: band.q))
+            items.append(Replacement(address: addresses.on, value: band.on))
+        }
+        sendUndo(items)
+        state.outputs[output - 1].lastWrite = lastWrite
+    }
+
+    fileprivate func sendUndo(_ items: [Replacement]) {
+        let snapshots = state.outputs
+        do {
+            try writeOnly(items, link: link)
+            state.notice = .none
+        } catch let error as ConfirmError {
+            state.outputs = snapshots
+            state.notice = error == .mismatch ? .writeFailedMismatch : .writeFailedKept
+        } catch {
+            state.outputs = snapshots
+            state.notice = .writeFailedKept
+        }
+    }
+}
+
+
 
