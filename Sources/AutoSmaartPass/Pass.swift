@@ -276,3 +276,91 @@ extension PassController {
     }
 }
 
+extension PassController {
+    func setSeededEQSnapshot(_ snapshot: [EqBandSnapshot]) {
+        guard let output = state.selectedOutput else { return }
+        state.outputs[output - 1].eqSnapshot = snapshot
+        try? outputs.save(state.outputs)
+    }
+
+    public func confirmEq() {
+        guard state.step == .eq, let bands = state.bands, let output = state.selectedOutput else { return }
+        if bands.isEmpty {
+            state.beforeCurve = state.postDelayMagnitude
+            state.afterCurve = state.postDelayMagnitude
+            state.eqRemeasureFailed = false
+            state.notice = .noEqWritten
+            openCompare(output: output)
+            return
+        }
+        guard !state.host.isEmpty, UInt16(state.port) != nil else {
+            state.notice = .writeFailedKept
+            return
+        }
+        var items: [Replacement] = []
+        for band in bands {
+            let addresses: (freq: String, gain: String, q: String, on: String)
+            do { addresses = try eqAddresses(output: output, band: band.index) } catch { return }
+            items.append(Replacement(address: addresses.freq, value: .float32(Float(band.hz))))
+            items.append(Replacement(address: addresses.gain, value: .float32(Float(band.gainDb))))
+            items.append(Replacement(address: addresses.q, value: .float32(Float(band.q))))
+            items.append(Replacement(address: addresses.on, value: .int32(1)))
+        }
+        do {
+            let restore = try confirmReplace(items, link: link)
+            var snapshots: [EqBandSnapshot] = []
+            for (offset, band) in bands.enumerated() {
+                let base = offset * 4
+                snapshots.append(EqBandSnapshot(
+                    index: band.index,
+                    freq: restore[base].value,
+                    gain: restore[base + 1].value,
+                    q: restore[base + 2].value,
+                    on: restore[base + 3].value
+                ))
+            }
+            state.outputs[output - 1].eqSnapshot = snapshots
+            try? outputs.save(state.outputs)
+            remeasureAfterEq(output: output)
+        } catch let error as ConfirmError {
+            state.notice = error == .mismatch ? .writeFailedMismatch : .writeFailedKept
+        } catch {
+            state.notice = .writeFailedKept
+        }
+    }
+
+    fileprivate func remeasureAfterEq(output: Int) {
+        state.beforeCurve = state.postDelayMagnitude
+        do {
+            let capture = try reader.readTrace()
+            if capture.magnitude.isEmpty {
+                state.afterCurve = nil
+                state.eqRemeasureFailed = true
+                state.notice = .couldNotRemeasure
+            } else {
+                state.afterCurve = capture.magnitude
+                state.eqRemeasureFailed = false
+                state.notice = .none
+            }
+        } catch {
+            state.afterCurve = nil
+            state.eqRemeasureFailed = true
+            state.notice = .couldNotRemeasure
+        }
+        openCompare(output: output)
+    }
+
+    fileprivate func openCompare(output: Int) {
+        if let shown = state.displayedDelayMs {
+            let count = state.bands?.count ?? 0
+            state.outputs[output - 1].lastWrite = count == 0
+                ? String(format: "%.1f ms · no EQ", shown)
+                : String(format: "%.1f ms · %d bands", shown, count)
+            try? outputs.save(state.outputs)
+        }
+        state.compareOpen = true
+        state.step = .compare
+    }
+}
+
+
