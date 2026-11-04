@@ -1,7 +1,7 @@
 import Foundation
 import AutoSmaartCore
 
-let smaartAPIURL = URL(string: "ws://127.0.0.1:26000/api/v4/")!
+public let smaartAPIURL = URL(string: "ws://127.0.0.1:26000/api/v4/")!
 
 public enum SmaartReaderError: Error, Equatable {
     case noTrace
@@ -17,7 +17,7 @@ public protocol SmaartReader: AnyObject {
     func readTargetCurve() throws -> [MagnitudePoint]
 }
 
-protocol SmaartWire: AnyObject {
+public protocol SmaartWire: AnyObject {
     func connect() throws
     func close()
     var isOpen: Bool { get }
@@ -25,29 +25,29 @@ protocol SmaartWire: AnyObject {
     func receive() throws -> String
 }
 
-final class URLSessionSmaartWire: SmaartWire {
+public final class URLSessionSmaartWire: SmaartWire {
     private let task: URLSessionWebSocketTask
     private let session: URLSession
-    private(set) var isOpen = false
+    public private(set) var isOpen = false
 
-    init(url: URL = smaartAPIURL) {
+    public init(url: URL = smaartAPIURL) {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 5
         session = URLSession(configuration: configuration)
         task = session.webSocketTask(with: url)
     }
 
-    func connect() throws {
+    public func connect() throws {
         task.resume()
         isOpen = true
     }
 
-    func close() {
+    public func close() {
         task.cancel(with: .normalClosure, reason: nil)
         isOpen = false
     }
 
-    func send(_ text: String) throws {
+    public func send(_ text: String) throws {
         let semaphore = DispatchSemaphore(value: 0)
         var sendError: Error?
         task.send(.string(text)) { error in
@@ -58,7 +58,7 @@ final class URLSessionSmaartWire: SmaartWire {
         if let sendError { throw sendError }
     }
 
-    func receive() throws -> String {
+    public func receive() throws -> String {
         let semaphore = DispatchSemaphore(value: 0)
         var received: Result<String, Error>?
         task.receive { result in
@@ -80,13 +80,13 @@ final class URLSessionSmaartWire: SmaartWire {
     }
 }
 
-final class OfficialSmaartSession: SmaartReader {
+public final class OfficialSmaartSession: SmaartReader {
     private let wire: SmaartWire
-    private(set) var isSessionOpen = false
+    public private(set) var isSessionOpen = false
 
-    init(wire: SmaartWire) { self.wire = wire }
+    public init(wire: SmaartWire) { self.wire = wire }
 
-    func openSession() throws {
+    public func openSession() throws {
         try wire.connect()
         let reply: [String: Any]
         do {
@@ -105,12 +105,12 @@ final class OfficialSmaartSession: SmaartReader {
         isSessionOpen = true
     }
 
-    func closeSession() {
+    public func closeSession() {
         wire.close()
         isSessionOpen = false
     }
 
-    func readTrace() throws -> SmaartCapture {
+    public func readTrace() throws -> SmaartCapture {
         guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
         let measurements = try request(["action": "get", "target": "measurements"])
         let rows = measurements["transferFunctionMeasurements"] as? [[String: Any]] ?? []
@@ -136,7 +136,7 @@ final class OfficialSmaartSession: SmaartReader {
         )
     }
 
-    func readTargetCurve() throws -> [MagnitudePoint] {
+    public func readTargetCurve() throws -> [MagnitudePoint] {
         guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
         let reply = try request(["action": "get", "target": "targetCurve"])
         if reply["error"] != nil { throw SmaartReaderError.noTarget }

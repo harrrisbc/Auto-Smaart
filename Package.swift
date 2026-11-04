@@ -14,13 +14,11 @@ let package = Package(
         .target(name: "AutoSmaartPass", dependencies: ["AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]),
         .target(
             name: "AutoSmaartUI",
-            dependencies: ["AutoSmaartPass", "AutoSmaartCore"],
+            dependencies: ["AutoSmaartPass", "AutoSmaartCore", "SmaartAPI", "ConsoleOSC"],
             resources: [.process("Resources")]
         ),
-        .executableTarget(
-            name: "AutoSmaartApp",
-            dependencies: ["AutoSmaartUI", "AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]
-        ),
+        .executableTarget(name: "AutoSmaartApp", dependencies: ["AutoSmaartUI"]),
+
         .testTarget(
             name: "AutoSmaartCoreTests",
             dependencies: ["AutoSmaartCore"],
@@ -43,6 +41,6 @@ let package = Package(
             name: "AutoSmaartUITests",
             dependencies: ["AutoSmaartUI", "AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]
         ),
-        .testTarget(name: "HardwareTests", dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"])
+        .testTarget(name: "HardwareTests", dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC", "AutoSmaartPass"])
     ]
 )
