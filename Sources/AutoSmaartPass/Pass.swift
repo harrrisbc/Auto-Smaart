@@ -209,3 +209,70 @@ public final class PassController: ObservableObject {
         state.step = .pick
     }
 }
+
+extension PassController {
+    public func confirmDelay() {
+        guard state.step == .delay, let shown = state.displayedDelayMs, let output = state.selectedOutput else { return }
+        guard !state.host.isEmpty, UInt16(state.port) != nil else {
+            state.notice = .writeFailedKept
+            return
+        }
+        let addresses: (delay: String, fineDelay: String)
+        do { addresses = try delayAddresses(output: output) } catch { return }
+        let value = OscValue.float32(Float(shown))
+        do {
+            let restore = try confirmReplace([
+                Replacement(address: addresses.delay, value: value),
+                Replacement(address: addresses.fineDelay, value: value)
+            ], link: link)
+            state.outputs[output - 1].delaySnapshot = DelaySnapshot(delay: restore[0].value, fineDelay: restore[1].value)
+            try? outputs.save(state.outputs)
+            state.delayWrittenThisPass = true
+            state.notice = .none
+            remeasureAfterDelay()
+        } catch let error as ConfirmError {
+            state.notice = error == .mismatch ? .writeFailedMismatch : .writeFailedKept
+        } catch {
+            state.notice = .writeFailedKept
+        }
+    }
+
+    public func retryRemeasure() {
+        guard state.step == .delay, state.delayWrittenThisPass, state.notice == .couldNotRemeasure else { return }
+        remeasureAfterDelay()
+    }
+
+    fileprivate func remeasureAfterDelay() {
+        let capture: SmaartCapture
+        do { capture = try reader.readTrace() } catch {
+            state.notice = .couldNotRemeasure
+            state.step = .delay
+            state.bands = nil
+            return
+        }
+        if capture.magnitude.isEmpty {
+            state.notice = .couldNotRemeasure
+            state.step = .delay
+            state.bands = nil
+            return
+        }
+        guard let name = state.passPresetName, let preset = state.presets.first(where: { $0.name == name }) else {
+            state.notice = .couldNotRemeasure
+            state.step = .delay
+            return
+        }
+        switch fitEq(measurement: capture.magnitude, preset: preset.points) {
+        case .noOverlap:
+            state.postDelayMagnitude = capture.magnitude
+            state.notice = .presetNoOverlap
+            state.step = .delay
+            state.bands = nil
+        case .bands(let bands):
+            state.postDelayMagnitude = capture.magnitude
+            state.bands = bands
+            state.step = .eq
+            state.notice = bands.isEmpty ? .noEqNeeded : .none
+        }
+    }
+}
+
