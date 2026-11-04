@@ -114,7 +114,8 @@ public final class OfficialSmaartSession: SmaartReader {
         guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
         let measurements = try request(["action": "get", "target": "measurements"])
         let rows = measurements["transferFunctionMeasurements"] as? [[String: Any]] ?? []
-        guard let name = rows.first(where: { $0["active"] as? Bool == true })?["measurementName"] as? String else {
+        guard let row = rows.first(where: { isActiveFlag($0["active"]) }),
+              let name = row["measurementName"] as? String else {
             throw SmaartReaderError.noTrace
         }
         let finderReply = try request([
@@ -126,12 +127,22 @@ public final class OfficialSmaartSession: SmaartReader {
                 ["automaticallyStop": true]
             ]
         ])
+        // Live v9 returns "delay"; fixtures and older docs use "delayFinderMs".
+        let delayMs = number(finderReply["delayFinderMs"]) ?? number(finderReply["delay"])
+
         let body = try request(["action": "get", "target": ["measurementName": name]])
-        let magnitude = magnitudePoints(body["magnitude"] as? [[String: Any]] ?? [])
+        var magnitude = magnitudePoints(body["magnitude"] as? [[String: Any]] ?? [])
+        if magnitude.isEmpty {
+            magnitude = magnitudeFromPairData(body["data"])
+        }
+        if magnitude.isEmpty, let endpoint = row["streamEndpoint"] as? String {
+            let frame = try receiveStreamFrame(path: endpoint)
+            magnitude = magnitudeFromPairData(frame["data"])
+        }
         if magnitude.isEmpty { throw SmaartReaderError.noTrace }
         return SmaartCapture(
             magnitude: magnitude,
-            delayFinderMs: number(finderReply["delayFinderMs"]),
+            delayFinderMs: delayMs,
             impulse: impulse(body["impulse"] as? [String: Any])
         )
     }
@@ -165,10 +176,34 @@ public final class OfficialSmaartSession: SmaartReader {
         return dict
     }
 
+    private func receiveStreamFrame(path: String) throws -> [String: Any] {
+        var components = URLComponents(url: smaartAPIURL, resolvingAgainstBaseURL: false)!
+        components.path = path
+        components.query = nil
+        guard let url = components.url else { throw SmaartReaderError.noTrace }
+        let stream = URLSessionSmaartWire(url: url)
+        try stream.connect()
+        defer { stream.close() }
+        let text = try stream.receive()
+        let object = try JSONSerialization.jsonObject(with: Data(text.utf8))
+        // Stream frames are bare objects (no response envelope).
+        return object as? [String: Any] ?? [:]
+    }
+
     private func magnitudePoints(_ rows: [[String: Any]]) -> [MagnitudePoint] {
         rows.compactMap { row in
             guard let hz = number(row["hz"]), let db = number(row["db"]) else { return nil }
             return MagnitudePoint(hz: hz, db: db, phase: number(row["phase"]) ?? 0)
+        }
+    }
+
+    /// Live TF stream uses `data: [[hz, db], ...]`.
+    private func magnitudeFromPairData(_ value: Any?) -> [MagnitudePoint] {
+        guard let rows = value as? [[Any]] else { return [] }
+        return rows.compactMap { row in
+            guard row.count >= 2, let hz = number(row[0]), let db = number(row[1]) else { return nil }
+            let phase = row.count >= 3 ? (number(row[2]) ?? 0) : 0
+            return MagnitudePoint(hz: hz, db: db, phase: phase)
         }
     }
 
@@ -177,6 +212,12 @@ public final class OfficialSmaartSession: SmaartReader {
             return nil
         }
         return Impulse(sampleRate: sampleRate, samples: samples)
+    }
+
+    private func isActiveFlag(_ value: Any?) -> Bool {
+        if let value = value as? Bool { return value }
+        if let value = value as? NSNumber { return value.boolValue }
+        return false
     }
 
     private func number(_ value: Any?) -> Double? {

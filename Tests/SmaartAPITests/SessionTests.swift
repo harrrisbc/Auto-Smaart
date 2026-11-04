@@ -120,6 +120,24 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(capture.magnitude, [MagnitudePoint(hz: 1000, db: -3, phase: 0)])
     }
 
+    func testLiveV9DelayKeyAndPairMagnitudeData() throws {
+        let measurements = #"{"response":{"transferFunctionMeasurements":[{"measurementName":"hi","active":true}]}}"#
+        let wire = ScriptedWire(replies: [
+            measurements,
+            measurements,
+            #"{"response":{"delay":12.35}}"#,
+            #"{"response":{"data":[[1000.0,-3.0],[2000.0,-6.0]],"description":"frequency vs magnitude (MTW)"}}"#
+        ])
+        let session = OfficialSmaartSession(wire: wire)
+        try session.openSession()
+        let capture = try session.readTrace()
+        XCTAssertEqual(capture.delayFinderMs, 12.35)
+        XCTAssertEqual(capture.magnitude, [
+            MagnitudePoint(hz: 1000, db: -3, phase: 0),
+            MagnitudePoint(hz: 2000, db: -6, phase: 0)
+        ])
+    }
+
     func testReadBeforeOpenThrowsSessionClosed() {
         let session = OfficialSmaartSession(wire: ScriptedWire(replies: []))
         XCTAssertThrowsError(try session.readTrace()) { error in
