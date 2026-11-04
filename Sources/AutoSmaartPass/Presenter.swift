@@ -84,7 +84,8 @@ public enum PassPresenter {
     }
 
     public static func readEnabled(_ state: PassState) -> Bool {
-        state.selectedOutput != nil && state.passPresetName != nil && !state.host.isEmpty && !state.port.isEmpty
+        // Read pulls from Smaart only — console host/port and a bank preset are for later writes.
+        state.selectedOutput != nil && state.smaartLive
     }
 
     public static func storeEnabled(_ state: PassState) -> Bool {

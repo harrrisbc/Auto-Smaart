@@ -87,6 +87,7 @@ public final class PassController: ObservableObject {
 
     public func selectOutput(_ index: Int) {
         guard (1...12).contains(index) else { return }
+        state.smaartLive = reader.isSessionOpen
         if state.selectedOutput == index { return }
         state.selectedOutput = index
         clearPassProgress()
@@ -133,7 +134,7 @@ public final class PassController: ObservableObject {
     }
 
     public func readTrace() {
-        guard state.selectedOutput != nil, state.passPresetName != nil, !state.host.isEmpty, !state.port.isEmpty else { return }
+        guard state.selectedOutput != nil, reader.isSessionOpen else { return }
         let capture: SmaartCapture
         do {
             capture = try reader.readTrace()

@@ -76,12 +76,14 @@ final class PresenterTests: XCTestCase {
         var state = PassState()
         XCTAssertFalse(PassPresenter.readEnabled(state))
         XCTAssertFalse(PassPresenter.storeEnabled(state))
+        state.selectedOutput = 1
+        XCTAssertFalse(PassPresenter.readEnabled(state))
+        state.smaartLive = true
+        XCTAssertTrue(PassPresenter.readEnabled(state))
         state.host = "10.0.0.8"
         state.port = "8000"
-        state.selectedOutput = 1
         state.passPresetName = "Main"
         state.draftName = "Main"
-        XCTAssertTrue(PassPresenter.readEnabled(state))
         XCTAssertTrue(PassPresenter.storeEnabled(state))
         state.draftName = " "
         XCTAssertFalse(PassPresenter.storeEnabled(state))
