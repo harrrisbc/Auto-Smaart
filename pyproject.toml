@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auto-smaart"
+version = "0.1.0"
+description = "Suggest-then-commit delay and parametric EQ from Smaart live data to mixing consoles via OSC"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Auto Smaart contributors" }]
+keywords = ["smaart", "osc", "audio", "eq", "live-sound"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+    "websockets>=12.0",
+    "python-osc>=1.8.3",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+auto-smaart = "auto_smaart.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
