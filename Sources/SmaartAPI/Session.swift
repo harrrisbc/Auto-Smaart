@@ -158,7 +158,11 @@ public final class OfficialSmaartSession: SmaartReader {
 
     private func decodeObject(_ text: String) throws -> [String: Any] {
         let object = try JSONSerialization.jsonObject(with: Data(text.utf8))
-        return object as? [String: Any] ?? [:]
+        guard let dict = object as? [String: Any] else { return [:] }
+        // Live Smaart v4 wraps payloads as {"response":{...}}; keep top-level errors as-is.
+        if dict["error"] != nil { return dict }
+        if let response = dict["response"] as? [String: Any] { return response }
+        return dict
     }
 
     private func magnitudePoints(_ rows: [[String: Any]]) -> [MagnitudePoint] {

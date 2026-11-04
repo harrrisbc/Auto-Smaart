@@ -23,13 +23,19 @@ public enum AppRuntime {
             .appendingPathComponent("Auto-Smaart", isDirectory: true)
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let session = OfficialSmaartSession(wire: URLSessionSmaartWire())
-        try? session.openSession()
         let bank = CurveBank(fileURL: root.appendingPathComponent("bank.json"))
         let outputs = OutputStore(fileURL: root.appendingPathComponent("outputs.json"))
         let link = LiveConsoleLink { box.host } port: { box.port }
         let pass = PassController(reader: session, link: link, bank: bank, outputs: outputs)
         pass.endpoint = box
-        pass.refreshSessionFlag()
+        // openSession blocks on URLSession WebSocket semaphores. Doing that on the main
+        // thread during SwiftUI startup freezes/kills the window once Smaart is live.
+        DispatchQueue.global(qos: .userInitiated).async {
+            try? session.openSession()
+            DispatchQueue.main.async {
+                pass.refreshSessionFlag()
+            }
+        }
         return pass
     }
 }

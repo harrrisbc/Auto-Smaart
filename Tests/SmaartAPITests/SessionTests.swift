@@ -104,6 +104,22 @@ final class SessionTests: XCTestCase {
         XCTAssertFalse(wire.isOpen)
     }
 
+    func testLiveResponseEnvelopeIsUnwrapped() throws {
+        let wrappedMeasurements = #"{"response":{"transferFunctionMeasurements":[{"measurementName":"TF","active":true}],"spectrumMeasurements":[]}}"#
+        let wire = ScriptedWire(replies: [
+            wrappedMeasurements,
+            wrappedMeasurements,
+            #"{"response":{"delayFinderMs":4.0}}"#,
+            #"{"response":{"magnitude":[{"hz":1000,"db":-3,"phase":0}]}}"#
+        ])
+        let session = OfficialSmaartSession(wire: wire)
+        try session.openSession()
+        XCTAssertTrue(session.isSessionOpen)
+        let capture = try session.readTrace()
+        XCTAssertEqual(capture.delayFinderMs, 4.0)
+        XCTAssertEqual(capture.magnitude, [MagnitudePoint(hz: 1000, db: -3, phase: 0)])
+    }
+
     func testReadBeforeOpenThrowsSessionClosed() {
         let session = OfficialSmaartSession(wire: ScriptedWire(replies: []))
         XCTAssertThrowsError(try session.readTrace()) { error in
