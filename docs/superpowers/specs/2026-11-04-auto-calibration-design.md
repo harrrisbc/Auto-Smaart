@@ -93,24 +93,27 @@ Names are case-sensitive. The app writes at most those four values for a band it
 
 A used band is turned on by sending `eq_on_<b>` as `1`. Unused bands are left untouched: no message of any kind, including no zero frequency, no 0 dB, no Q 0, and no off switch.
 
-### Open item: Matrix delay OSC path
+### Delay addresses
 
-The delay write uses the Matrix output delay address in the same QLab DiGiCo dictionary that supplies the EQ addresses above. That exact path is not confirmed in this spec.
+A delay read, write, restore, or undo uses only this pair, in this order, for the selected output `<n>`:
 
-Until a confirmed path is recorded here, the app must not guess one. Third-party command lists are not confirmation. While the path is unconfirmed:
+- `/sd/Matrix_Outputs/<n>/Channel_Delay/delay`
+- `/sd/Matrix_Outputs/<n>/Channel_Delay/fine_delay`
 
-- Delay confirm sends no OSC, including no read.
-- The Delay screen shows the Smaart suggestion and the words "Matrix delay OSC path".
-- EQ stays locked.
-- Undo cannot send a delay value.
+No other delay address is sent. The confirmed Matrix 1 example, value 0, is:
 
-When the path is confirmed, this spec is updated with the exact address string and the unit. This app sends a delay only if that confirmed parameter is in milliseconds. The value sent is the confirmed suggestion in milliseconds. If the confirmed parameter is in any other unit, the app still must not guess a conversion, and delay writes stay disabled. That limit is part of this same open item, not a second one.
+```
+/sd/Matrix_Outputs/1/Channel_Delay/delay 0
+/sd/Matrix_Outputs/1/Channel_Delay/fine_delay 0
+```
+
+The value the operator confirms is the argument of both messages. This spec does not state a unit for either address and does not apply a numeric range.
 
 ## Flow
 
 1. On Pick, the operator selects one Matrix output and one preset, then presses **Read trace**.
 2. The app reads the current Smaart trace. With a magnitude trace and a delay suggestion, Delay unlocks and the app opens it. The suggestion is the Smaart delay from Inputs, not a value derived from the preset. The Delay supporting line says that. It must not say the suggestion came from the target or the reference.
-3. Delay shows the suggestion in milliseconds to one decimal place, rounded half away from zero. That rounded value is what a later write sends. If it is below 0.0 ms or above 1300.0 ms, confirm sends nothing, EQ stays locked, and Delay shows "Delay is outside 0.0–1300.0 ms." That bound is the Quantum 225 variable-delay range. Delay also shows the saved delay snapshot for this output, or "No previous value yet". It does not read the console to fill that line. It shows "Nothing is sent until you confirm." The operator presses **Confirm delay write** to accept. **Back** returns to Pick and sends nothing.
+3. Delay shows the Smaart suggestion in milliseconds to one decimal place, rounded half away from zero. That displayed number is the value the operator confirms. Delay also shows the saved delay snapshot for this output, or "No previous value yet". It does not read the console to fill that line. It shows "Nothing is sent until you confirm." The operator presses **Confirm delay write** to accept. **Back** returns to Pick and sends nothing.
 4. After a successful delay write, the app remeasures immediately. EQ is calculated only from that new measurement, and only when the remeasure succeeds.
 5. EQ shows each used band's frequency, gain, and Q, and an em dash for every unused band through band 8. Before confirm it does not read the console. If an EQ snapshot already exists, the screen labels it "Last undo snapshot"; otherwise it says the previous bands are read on confirm. The operator presses **Confirm EQ write**. Nothing is sent until that press.
 6. If that confirm sent one or more EQ messages and the write succeeded, the app remeasures and opens Compare. If the confirm sent no EQ messages (zero bands), it does not remeasure; Compare opens on the post-delay magnitude.
@@ -123,7 +126,7 @@ Another output is another pass, started again from Pick.
 
 No OSC of any kind is sent before the confirm press. The fake-console test asserts an empty receive buffer up to that press.
 
-A zero-band EQ confirm, an out-of-range delay, and an unconfirmed delay path do not enter this sequence. They send no OSC. A zero-band confirm still opens Compare and does not replace the EQ snapshot.
+A zero-band EQ confirm does not enter this sequence. It sends no OSC, still opens Compare, and does not replace the EQ snapshot.
 
 Every other confirm does this, in order:
 
@@ -132,7 +135,7 @@ Every other confirm does this, in order:
 3. Write the new values.
 4. Mark success only if every read and every write in that confirm is accepted. On success, replace the saved snapshot with the restore copy.
 
-Delay confirm reads and writes only the confirmed Matrix delay parameter. EQ confirm reads and writes only the used bands, four parameters each. It does not read or write unused bands, and it does not read or write delay. Write order is band 1 upward, and within a band: freq, gain, Q, on.
+Delay confirm reads and writes only `/sd/Matrix_Outputs/<n>/Channel_Delay/delay` and `/sd/Matrix_Outputs/<n>/Channel_Delay/fine_delay`, in that order. Both arguments are the confirmed suggestion. EQ confirm reads and writes only the used bands, four parameters each. It does not read or write unused bands, and it does not read or write delay. Write order is band 1 upward, and within a band: freq, gain, Q, on.
 
 If step 1 fails, the app writes nothing, shows "Write failed. Previous value kept.", and stays on that confirm screen. The saved snapshot is unchanged. The confirm button retries the same action.
 
@@ -151,7 +154,7 @@ Pick's last-write line changes only when Compare opens. The text is `<delay ms> 
 - EQ shows the previous bands from the EQ snapshot and does not itself send undo.
 - Compare's **Undo last write** writes the delay snapshot and, band for band, the EQ snapshot. Bands absent from the EQ snapshot are not sent.
 
-A control that has no snapshot yet is absent, not filled with zero. If the delay path is unconfirmed, delay undo is not sent. The app never invents a previous value.
+A control that has no snapshot yet is absent, not filled with zero. The app never invents a previous value. Delay undo sends the saved pair and no other delay address.
 
 ## EQ fit
 
@@ -184,7 +187,6 @@ Zero bands means the EQ screen says "No EQ is needed." Every band row is an em d
 | --- | --- |
 | No Smaart trace on Read trace | Stay on Pick. No delay suggestion. No OSC. Show "No Smaart trace." |
 | Magnitude with no delay suggestion | Stay on Pick. Show "No delay suggestion." No OSC. Do not calculate EQ. |
-| Delay path unconfirmed | Suggestion may be shown. Confirm sends nothing. EQ stays locked. |
 | Delay not confirmed | Do not calculate EQ. EQ stays locked. |
 | OSC write or pre-write read fails | Not a success. Previous snapshot kept. Stay on the confirm screen. Operator can retry. |
 | Remeasure fails after a successful delay write | The delay write stays a success. Do not calculate EQ. Stay on Delay. Show "Could not remeasure." A quiet **Retry remeasure** reads Smaart again and does not write the console. |
@@ -214,9 +216,9 @@ Three test groups are required. No extra console family is part of the tests.
 - absolute deviation at or below 1.0 dB produces zero bands
 - EQ is not calculated when delay has not been confirmed
 
-**Fake console.** An OSC receiver for this Quantum 225 driver, not a second console. It must observe zero messages before confirm. After confirm it must see the read, then only the allowed writes. It must also show a failed write marked as not a success, with the previous snapshot unchanged when the restore succeeds.
+**Fake console.** An OSC receiver for this Quantum 225 driver, not a second console. It must observe zero messages before confirm. After a delay confirm it must see the read of both delay addresses, then only those two writes, both carrying the confirmed suggestion. After an EQ confirm it must see the read, then only the allowed band writes. It must also show a failed write marked as not a success, with the previous snapshot unchanged when the restore succeeds.
 
-**One real-hardware test.** A DiGiCo Quantum 225, one Matrix output, a delay write, then an EQ write of at least one band, then a remeasure. This test runs only after **Matrix delay OSC path** is confirmed in this spec, because the app must not guess the path. It is still part of this plan.
+**One real-hardware test.** A DiGiCo Quantum 225, one Matrix output, a delay write to both delay addresses, then an EQ write of at least one band, then a remeasure.
 
 ## Units that implement this
 
@@ -230,4 +232,4 @@ An implementation plan for this spec splits along these boundaries. Each one can
 | Console | Quantum 225 OSC read and write, silence before confirm | QLab dictionary addresses, operator IP and port |
 | Pass UI | Four screens, unlock rules, confirm, undo, errors | The four units above |
 
-The console unit is the only writer. The fit unit does not send OSC. The UI does not invent a delay address.
+The console unit is the only writer. The fit unit does not send OSC. Delay traffic uses only the two addresses in Delay addresses.
