@@ -39,10 +39,32 @@ public enum Theme {
     static let afterTrace = Color(hex: 0xe8d5b7)
 
     static func registerFonts() {
+        // Do not touch Bundle.module — SPM's accessor fatalErrors when the resource
+        // bundle is not beside the executable (direct launches / incomplete .app packs).
+        guard let bundle = uiResourceBundle() else { return }
         for name in ["Inter-VariableFont", "PlayfairDisplay-Italic-VariableFont"] {
-            guard let url = Bundle.module.url(forResource: name, withExtension: "ttf") else { continue }
+            guard let url = bundle.url(forResource: name, withExtension: "ttf") else { continue }
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
+    }
+
+    private static func uiResourceBundle() -> Bundle? {
+        let bundleName = "AutoSmaart_AutoSmaartUI.bundle"
+        var candidates: [URL] = []
+        if let env = ProcessInfo.processInfo.environment["PACKAGE_RESOURCE_BUNDLE_PATH"] {
+            candidates.append(URL(fileURLWithPath: env))
+        }
+        if let execDir = Bundle.main.executableURL?.deletingLastPathComponent() {
+            candidates.append(execDir.appendingPathComponent(bundleName))
+        }
+        if let resources = Bundle.main.resourceURL {
+            candidates.append(resources.appendingPathComponent(bundleName))
+        }
+        candidates.append(Bundle.main.bundleURL.appendingPathComponent(bundleName))
+        for url in candidates {
+            if let bundle = Bundle(url: url) { return bundle }
+        }
+        return nil
     }
 }
 

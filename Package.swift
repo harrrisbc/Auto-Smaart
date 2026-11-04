@@ -17,7 +17,21 @@ let package = Package(
             dependencies: ["AutoSmaartPass", "AutoSmaartCore", "SmaartAPI", "ConsoleOSC"],
             resources: [.process("Resources")]
         ),
-        .executableTarget(name: "AutoSmaartApp", dependencies: ["AutoSmaartUI"]),
+        .executableTarget(
+            name: "AutoSmaartApp",
+            dependencies: ["AutoSmaartUI"],
+            exclude: ["Info.plist"],
+            // Embed Info.plist so a bare SPM binary can register with WindowServer
+            // (without this, lsappinfo shows !cgsConnection and the process is culled).
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Sources/AutoSmaartApp/Info.plist"
+                ])
+            ]
+        ),
 
         .testTarget(
             name: "AutoSmaartCoreTests",

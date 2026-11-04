@@ -1,26 +1,29 @@
 import SwiftUI
 import AppKit
+import Darwin
 import AutoSmaartUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // SPM executables default to accessory/background and drop mouse clicks.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Agent / terminal launches send SIGHUP when the launcher shell exits.
+        signal(SIGHUP, SIG_IGN)
         NSApp.setActivationPolicy(.regular)
-        // Without a bundle, AppKit may idle-exit or quit when a WindowGroup hiccups.
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
         ProcessInfo.processInfo.disableSuddenTermination()
         ProcessInfo.processInfo.disableAutomaticTermination("Auto-Smaart window")
         NSApp.activate(ignoringOtherApps: true)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        // Landing must stay up; do not quit if the first WindowGroup presentation races.
         false
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         NSApp.activate(ignoringOtherApps: true)
         if !flag {
-            // Ask SwiftUI/AppKit to show a window again if the user closed it.
             NSApp.windows.forEach { $0.makeKeyAndOrderFront(nil) }
         }
         return true
@@ -32,20 +35,21 @@ struct AutoSmaartApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
+        signal(SIGHUP, SIG_IGN)
         NSApplication.shared.setActivationPolicy(.regular)
     }
 
     var body: some Scene {
-        WindowGroup {
+        // Single Window avoids WindowGroup spawning extra off-screen scenes that then vanish.
+        Window("Auto-Smaart", id: "main") {
             ShellView(controller: AppRuntime.controller)
                 .onAppear {
                     AppRuntime.controller.refreshSessionFlag()
-                    // Activate only — ordering front during WindowGroup presentation caused
-                    // "Window move completed without beginning" and a silent quit.
                     NSApp.activate(ignoringOtherApps: true)
                 }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: ThemeMetrics.windowWidth, height: ThemeMetrics.windowHeight)
+        .defaultPosition(.center)
     }
 }
