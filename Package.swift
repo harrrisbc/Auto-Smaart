@@ -11,6 +11,7 @@ let package = Package(
         .target(name: "AutoSmaartCore"),
         .target(name: "SmaartAPI", dependencies: ["AutoSmaartCore"]),
         .target(name: "ConsoleOSC", dependencies: ["AutoSmaartCore"]),
+        .target(name: "AutoSmaartPass", dependencies: ["AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]),
         .executableTarget(
             name: "AutoSmaartApp",
             dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"],
@@ -20,12 +21,20 @@ let package = Package(
             name: "AutoSmaartCoreTests",
             dependencies: ["AutoSmaartCore"],
             path: "Tests",
-            exclude: ["SmaartAPITests", "ConsoleOSCTests", "HardwareTests"],
+            exclude: ["SmaartAPITests", "ConsoleOSCTests", "HardwareTests", "AutoSmaartPassTests"],
             sources: ["AutoSmaartCoreTests"],
             resources: [.process("Fixtures")]
         ),
         .testTarget(name: "SmaartAPITests", dependencies: ["SmaartAPI", "AutoSmaartCore"]),
         .testTarget(name: "ConsoleOSCTests", dependencies: ["ConsoleOSC", "AutoSmaartCore"]),
+        .testTarget(
+            name: "AutoSmaartPassTests",
+            dependencies: ["AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"],
+            path: "Tests",
+            exclude: ["AutoSmaartCoreTests", "SmaartAPITests", "ConsoleOSCTests", "HardwareTests"],
+            sources: ["AutoSmaartPassTests"],
+            resources: [.process("Fixtures")]
+        ),
         .testTarget(name: "HardwareTests", dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"])
     ]
 )
