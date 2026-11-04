@@ -12,16 +12,20 @@ let package = Package(
         .target(name: "SmaartAPI", dependencies: ["AutoSmaartCore"]),
         .target(name: "ConsoleOSC", dependencies: ["AutoSmaartCore"]),
         .target(name: "AutoSmaartPass", dependencies: ["AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]),
+        .target(
+            name: "AutoSmaartUI",
+            dependencies: ["AutoSmaartPass", "AutoSmaartCore"],
+            resources: [.process("Resources")]
+        ),
         .executableTarget(
             name: "AutoSmaartApp",
-            dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"],
-            resources: [.process("Resources")]
+            dependencies: ["AutoSmaartUI", "AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]
         ),
         .testTarget(
             name: "AutoSmaartCoreTests",
             dependencies: ["AutoSmaartCore"],
             path: "Tests",
-            exclude: ["SmaartAPITests", "ConsoleOSCTests", "HardwareTests", "AutoSmaartPassTests"],
+            exclude: ["SmaartAPITests", "ConsoleOSCTests", "HardwareTests", "AutoSmaartPassTests", "AutoSmaartUITests"],
             sources: ["AutoSmaartCoreTests"],
             resources: [.process("Fixtures")]
         ),
@@ -31,9 +35,13 @@ let package = Package(
             name: "AutoSmaartPassTests",
             dependencies: ["AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"],
             path: "Tests",
-            exclude: ["AutoSmaartCoreTests", "SmaartAPITests", "ConsoleOSCTests", "HardwareTests"],
+            exclude: ["AutoSmaartCoreTests", "SmaartAPITests", "ConsoleOSCTests", "HardwareTests", "AutoSmaartUITests"],
             sources: ["AutoSmaartPassTests"],
             resources: [.process("Fixtures")]
+        ),
+        .testTarget(
+            name: "AutoSmaartUITests",
+            dependencies: ["AutoSmaartUI", "AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]
         ),
         .testTarget(name: "HardwareTests", dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"])
     ]
