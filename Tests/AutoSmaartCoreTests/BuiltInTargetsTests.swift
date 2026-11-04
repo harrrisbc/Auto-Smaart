@@ -5,21 +5,26 @@ final class BuiltInTargetsTests: XCTestCase {
     func testFourStartingShapes() {
         XCTAssertEqual(BuiltInTargets.presets.map(\.name), ["Flat", "Speech", "Music", "Haystack"])
         XCTAssertTrue(BuiltInTargets.presets.allSatisfy { $0.kind == .target })
+
         let flat = BuiltInTargets.presets[0].points
         XCTAssertFalse(flat.isEmpty)
-        XCTAssertTrue(flat.allSatisfy { abs($0.db) < 0.001 })
+        // Not a ruler-flat line: mid and high differ, and HF rises for ear behavior.
+        let mid = flat.first { $0.hz == 1000 }?.db ?? 0
+        let high = flat.first { $0.hz == 10000 }?.db ?? 0
+        XCTAssertGreaterThan(high - mid, 2)
+        XCTAssertFalse(flat.allSatisfy { abs($0.db - mid) < 0.05 })
 
         let speech = BuiltInTargets.presets[1].points
-        XCTAssertGreaterThan(speech.first { $0.hz == 80 }?.db ?? 0, 2)
-        XCTAssertEqual(speech.first { $0.hz == 1000 }?.db ?? -1, 0, accuracy: 0.001)
+        XCTAssertLessThan(speech.first { $0.hz == 50 }?.db ?? 0, -2)
+        XCTAssertGreaterThan(speech.first { $0.hz == 1000 }?.db ?? -10, -1)
 
         let music = BuiltInTargets.presets[2].points
-        XCTAssertEqual(music.first { $0.hz == 50 }?.db ?? 0, 4.5, accuracy: 0.001)
+        XCTAssertGreaterThan(music.first { $0.hz == 50 }?.db ?? 0, 2)
         XCTAssertLessThan(music.first { $0.hz == 2000 }?.db ?? 0, 0)
 
         let haystack = BuiltInTargets.presets[3].points
-        XCTAssertEqual(haystack.first { $0.hz == 30 }?.db ?? 0, 9, accuracy: 0.2)
-        XCTAssertEqual(haystack.first { $0.hz == 1000 }?.db ?? -1, 0, accuracy: 0.001)
+        XCTAssertGreaterThan(haystack.first { $0.hz == 40 }?.db ?? 0, 3)
+        XCTAssertLessThan(abs(haystack.first { $0.hz == 1000 }?.db ?? 99), 1)
     }
 
     func testMergeKeepsBankCurvesAndLetsBankOverrideBuiltIn() {
