@@ -83,31 +83,31 @@ final class URLSessionSmaartWire: SmaartWire {
 final class OfficialSmaartSession: SmaartReader {
     private let wire: SmaartWire
     private(set) var isSessionOpen = false
-    /// First non-auth payload received on open, reused as the next `request` response
-    /// so scripted tests can share the open probe with the first command reply.
-    private var pendingReceive: String?
 
     init(wire: SmaartWire) { self.wire = wire }
 
     func openSession() throws {
         try wire.connect()
-        let text = try wire.receive()
-        let reply = try decodeObject(text)
+        let reply: [String: Any]
+        do {
+            reply = try request(["action": "get", "target": "measurements"])
+        } catch {
+            wire.close()
+            isSessionOpen = false
+            throw error
+        }
         if reply["error"] as? String == "authentication required"
             || reply["error"] as? String == "incorrect password" {
             wire.close()
             isSessionOpen = false
-            pendingReceive = nil
             throw SmaartReaderError.sessionClosed
         }
-        pendingReceive = text
         isSessionOpen = true
     }
 
     func closeSession() {
         wire.close()
         isSessionOpen = false
-        pendingReceive = nil
     }
 
     func readTrace() throws -> SmaartCapture {
@@ -152,13 +152,7 @@ final class OfficialSmaartSession: SmaartReader {
     private func request(_ payload: [String: Any]) throws -> [String: Any] {
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
         try wire.send(String(data: data, encoding: .utf8)!)
-        let text: String
-        if let pending = pendingReceive {
-            pendingReceive = nil
-            text = pending
-        } else {
-            text = try wire.receive()
-        }
+        let text = try wire.receive()
         return try decodeObject(text)
     }
 

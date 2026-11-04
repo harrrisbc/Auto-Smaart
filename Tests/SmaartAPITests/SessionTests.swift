@@ -22,8 +22,10 @@ final class SessionTests: XCTestCase {
     }
 
     func testFinderIsKeptWhenImpulseIsAlsoInThePayload() throws {
+        let measurements = #"{"transferFunctionMeasurements":[{"measurementName":"Later","active":false},{"measurementName":"TF","active":true}]}"#
         let wire = ScriptedWire(replies: [
-            #"{"transferFunctionMeasurements":[{"measurementName":"Later","active":false},{"measurementName":"TF","active":true}]}"#,
+            measurements,
+            measurements,
             #"{"delayFinderMs":12.35}"#,
             #"{"magnitude":[{"hz":1000,"db":-3,"phase":15}],"impulse":{"sampleRate":48000,"samples":[0,0,1]},"coherence":0.9}"#
         ])
@@ -36,8 +38,10 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(capture.impulse?.samples, [0, 0, 1])
         XCTAssertEqual(delaySuggestion(of: capture), .milliseconds(12.35))
         let sent = try wire.sent.map { try JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }
-        XCTAssertEqual(sent[0], JSONValue.object(["action": .string("get"), "target": .string("measurements")]))
-        XCTAssertEqual(sent[1], JSONValue.object([
+        let getMeasurements = JSONValue.object(["action": .string("get"), "target": .string("measurements")])
+        XCTAssertEqual(sent[0], getMeasurements)
+        XCTAssertEqual(sent[1], getMeasurements)
+        XCTAssertEqual(sent[2], JSONValue.object([
             "action": .string("findDelay"),
             "target": .object(["measurementName": .string("TF")]),
             "properties": .array([
@@ -49,8 +53,10 @@ final class SessionTests: XCTestCase {
     }
 
     func testMissingFinderLeavesImpulseForTheDelayRule() throws {
+        let measurements = #"{"transferFunctionMeasurements":[{"measurementName":"TF","active":true}]}"#
         let wire = ScriptedWire(replies: [
-            #"{"transferFunctionMeasurements":[{"measurementName":"TF","active":true}]}"#,
+            measurements,
+            measurements,
             #"{"error":"not implemented"}"#,
             #"{"magnitude":[{"hz":1000,"db":0}],"impulse":{"sampleRate":48000,"samples":[0,0.1,-0.4,0.9,0.9]}}"#
         ])
@@ -63,9 +69,8 @@ final class SessionTests: XCTestCase {
     }
 
     func testNoActiveTransferFunctionIsNoTrace() throws {
-        let wire = ScriptedWire(replies: [
-            #"{"spectrumMeasurements":[{"measurementName":"RTA","active":true}],"transferFunctionMeasurements":[]}"#
-        ])
+        let empty = #"{"spectrumMeasurements":[{"measurementName":"RTA","active":true}],"transferFunctionMeasurements":[]}"#
+        let wire = ScriptedWire(replies: [empty, empty])
         let session = OfficialSmaartSession(wire: wire)
         try session.openSession()
         XCTAssertThrowsError(try session.readTrace()) { error in
@@ -75,6 +80,7 @@ final class SessionTests: XCTestCase {
 
     func testTargetCurveAndMissingTarget() throws {
         let wire = ScriptedWire(replies: [
+            #"{"transferFunctionMeasurements":[]}"#,
             #"{"points":[{"hz":100,"db":0},{"hz":1000,"db":-6}]}"#,
             #"{"error":"unknown target"}"#
         ])
@@ -95,6 +101,7 @@ final class SessionTests: XCTestCase {
         let session = OfficialSmaartSession(wire: wire)
         XCTAssertThrowsError(try session.openSession())
         XCTAssertFalse(session.isSessionOpen)
+        XCTAssertFalse(wire.isOpen)
     }
 
     func testReadBeforeOpenThrowsSessionClosed() {
