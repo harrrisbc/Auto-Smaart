@@ -1,0 +1,31 @@
+# Copy to config.yaml and adjust. Override with env: AUTO_SMAART_* (see README).
+
+smaart:
+  host: "127.0.0.1"
+  port: 26000
+  # use_mock: true  # CLI --mock forces mock stream without real Smaart
+
+osc:
+  host: "127.0.0.1"
+  port: 10023
+  console: generic  # generic | x32_stub
+
+safety:
+  dry_run: true          # MUST set false + --commit to send OSC
+  max_eq_boost_db: 6.0
+  max_eq_cut_db: 12.0
+  max_delay_ms: 500.0
+
+solver:
+  target_curve: flat     # flat | file (future: path to CSV)
+  max_bands: 4
+  band_q_default: 2.0
+
+channels:
+  # Logical channel id -> console mapping (interpreted by console driver)
+  - id: main_l
+    osc_path_prefix: "/main/st/mix"
+    eq_band_indices: [1, 2, 3, 4]
+  - id: main_r
+    osc_path_prefix: "/main/st/mix"
+    eq_band_indices: [1, 2, 3, 4]
