@@ -4,32 +4,64 @@ Visual source: Superdesign library prompt `neural-noir-interface-style` (Neural 
 
 ## Product
 
-Auto-Smaart is a Mac app for tuning a live-sound system before a show, and for installed systems that get locked after tuning.
+Auto-Smaart is one Mac app with two pre-show modes that share the same window chrome, console connection, Smaart API session, and Stop safety control:
 
-- Reads Smaart through the official API: magnitude, phase, and delay. No screen capture.
-- Writes one DiGiCo Quantum 225 Matrix output at a time over OSC. QLab-style addresses the user named: `/sd/Matrix_Outputs/<n>/EQ/eq_freq_1` through `eq_freq_8`, and `eq_gain_1` through `eq_gain_8`, plus the matching delay address for that same output.
-- Up to 8 EQ bands. Unused bands stay empty. Never fill all 8 with placeholder zeros.
-- Flow: pick one Matrix output and one curve-bank preset, read the trace, suggest delay, user confirms, OSC write, remeasure, suggest EQ (frequency, gain, Q), user confirms, OSC write, remeasure, before/after magnitude compare.
-- Curve bank stores Smaart target curves and captured reference traces (example name: Main). User can store and recall.
+1. **Calibration** — tune one Matrix output to a curve-bank preset (confirm-before-write).
+2. **Ring Out** — FIXED mic/bus feedback ring-out (auto-write notches, with undo).
+
+Modes are separate controllers and write paths. Only one mode’s write loop may be active at a time.
+
+Shared product rules:
+
+- Reads Smaart through the official API. No screen capture.
+- DiGiCo Quantum 225 over OSC.
+- Up to 8 EQ bands. Unused bands stay empty (em dash). Never fill unused bands with zeros.
 - Calculation is deterministic. Do not present suggestions as AI.
-- Nothing is written to the console until the user confirms. Previous values stay available for undo.
+- **Stop — mute all** is always visible in both modes. It mutes all mics and all outputs. It does not undo writes.
 
-## Screens (one app, four steps)
+Calibration-only:
 
-Same window chrome on every screen. A left step rail marks the current step. Content changes; the shell does not.
+- Writes one Matrix output at a time. Confirm before every write. Undo remembers previous values.
+- Flow: Pick → Delay → EQ → Compare.
+- Curve bank stores Smaart target curves and captured reference traces.
+
+Ring Out-only:
+
+- Fader target and EQ destination are each Input channel or Bus.
+- Auto-writes −3.0 dB notches at Q 16.00; same frequency deepens the same band; max 8 bands; stop at +5.0 dB above first feedback.
+- Detection focus 100 Hz–8 kHz. Flow: Setup → Running → Notch → Done.
+
+## Screens (one app, two modes)
+
+Same window chrome on every screen. Left rail top is a shared **Mode** switch (Calibration | Ring Out). Below it, the active mode’s step list. Content changes; the shell does not.
+
+### Mode entrance
+
+- Left-rail Mode control: two-segment pill. Active mode uses gold border + light-gold label on `rgba(167,139,113,0.16)`. Inactive mode is a quiet text link into that mode’s first screen (Calibration → Pick; Ring Out → Setup).
+- While a Ring Out loop is running (Running / Notch), mode switch is locked: Calibration is dimmed, with the note “Mode switch locked while loop runs. Stop first.”
+- Title bar shows `Quantum 225 · Calibration|Ring Out · <step>`.
+
+### Calibration steps
 
 1. Pick — choose one Matrix output and one curve preset, then read the trace.
 2. Delay — show the suggested delay against the current console value. Confirm writes. Undo remembers the previous value.
 3. EQ — show only the bands in use (0–8). Empty rows stay blank. Confirm writes. Undo remembers the previous bands.
 4. Compare — after the confirmed write and remeasure, overlay before and after magnitude.
 
+### Ring Out steps
+
+1. Setup — pick fader target + EQ destination, then start.
+2. Running — fader rising, RTA peak, notch list, Stop.
+3. Notch — fader at −∞, new −3 dB cut shown, continue.
+4. Done — +5 dB or 8-band stop; Undo notches; safety note.
+
 ## Window
 
 - One macOS app window, 1440×900. Traffic-light buttons, title “Auto-Smaart”, subtitle “Quantum 225”.
 - No browser chrome, no website nav, no hero, no pricing, no marketing footer, no giant display headline.
-- Regions: 56px title bar, 220px left step rail, remaining canvas, 64px bottom action bar.
-- Left rail steps, in order: Pick, Delay, EQ, Compare. Current step uses a gold 2px left bar and light-gold label. Future steps are dim. Completed steps show a small gold check.
-- Bottom bar is the only place for the primary action. Primary action is a white pill, black text. Destructive or “do not write” state is a quiet text line, not a second hero button.
+- Regions: 56px title bar, 220px left rail (Mode switch + step list), remaining canvas, 64px bottom action bar.
+- Current step uses a gold 2px left bar and light-gold label. Future steps are dim. Completed steps show a small gold check.
+- Bottom bar is the only place for the primary action. Primary action is a white pill, black text. Destructive actions (**Stop — mute all**, quiet Undo) are text lines, not a second hero button.
 
 ## Color
 
