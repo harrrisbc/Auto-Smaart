@@ -6,6 +6,7 @@ import SmaartAPI
 
 final class ScriptedReader: SmaartReader {
     var isSessionOpen: Bool
+    var preferredMeasurementName = ""
     var traces: [SmaartCapture]
     var target: [MagnitudePoint]?
     private(set) var traceReads = 0

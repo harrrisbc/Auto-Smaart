@@ -12,7 +12,9 @@ public struct ShellView: View {
         VStack(spacing: 0) {
             titleBar
             HStack(spacing: 0) {
-                rail
+                if showsWorkflowRail {
+                    rail
+                }
                 screen
             }
             bottomBar
@@ -20,24 +22,39 @@ public struct ShellView: View {
         .frame(width: ThemeMetrics.windowWidth, height: ThemeMetrics.windowHeight)
         .background(Theme.background)
         .foregroundStyle(Theme.text)
-        .onAppear { Theme.registerFonts() }
+        .onAppear {
+            Theme.registerFonts()
+            controller.refreshSessionFlag()
+        }
+    }
+
+    /// Delay / EQ / Compare stay available after Read — not on the landing page.
+    private var showsWorkflowRail: Bool {
+        switch controller.state.step {
+        case .delay, .eq, .compare: return true
+        case .pick, .settings: return false
+        }
     }
 
     private var titleBar: some View {
         HStack {
             Text("Auto-Smaart")
                 .font(.custom("Playfair Display", size: 18).italic())
-                .padding(.leading, 78)
-            Text("Quantum 225")
-                .font(.custom("Inter", size: 13))
-                .foregroundStyle(Theme.secondary)
+                .padding(.leading, showsWorkflowRail ? 78 : ThemeMetrics.pagePadding)
+            if showsWorkflowRail {
+                Text("Quantum 225")
+                    .font(.custom("Inter", size: 13))
+                    .foregroundStyle(Theme.secondary)
+            }
             Spacer()
             HStack(spacing: 8) {
                 Circle().fill(controller.state.smaartLive ? Theme.live : Theme.dim).frame(width: 8, height: 8)
-                Text(PassPresenter.smaartLabel).font(.custom("Inter", size: 13)).foregroundStyle(Theme.secondary)
-                Text(PassPresenter.oscStatus(armed: PassPresenter.oscArmed(controller.state)))
+                Text(PassPresenter.smaartConnectionLine(live: controller.state.smaartLive))
                     .font(.custom("Inter", size: 13))
                     .foregroundStyle(Theme.secondary)
+                if controller.state.step == .pick || controller.state.step == .settings {
+                    QuietButton(title: PassPresenter.settings) { controller.openRail(.settings) }
+                }
             }
             .padding(.trailing, ThemeMetrics.pagePadding)
         }
@@ -75,6 +92,7 @@ public struct ShellView: View {
     @ViewBuilder private var screen: some View {
         switch controller.state.step {
         case .pick: PickView(controller: controller)
+        case .settings: SettingsView(controller: controller)
         case .delay: DelayView(controller: controller)
         case .eq: EQView(controller: controller)
         case .compare: CompareView(controller: controller)
@@ -99,8 +117,13 @@ public struct ShellView: View {
     @ViewBuilder private var bottomAction: some View {
         switch controller.state.step {
         case .pick:
-            PrimaryButton(title: PassPresenter.readTrace) { controller.readTrace() }
-                .disabled(!PassPresenter.readEnabled(controller.state))
+            HStack(spacing: 16) {
+                QuietButton(title: PassPresenter.stop) { controller.stop() }
+                PrimaryButton(title: PassPresenter.readTrace) { controller.readTrace() }
+                    .disabled(!PassPresenter.readEnabled(controller.state))
+            }
+        case .settings:
+            QuietButton(title: PassPresenter.back) { controller.back() }
         case .delay:
             HStack(spacing: 16) {
                 QuietButton(title: PassPresenter.back) { controller.back() }

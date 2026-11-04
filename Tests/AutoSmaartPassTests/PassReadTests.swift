@@ -66,10 +66,10 @@ final class PassReadTests: XCTestCase {
         let (pass, _, _, directory) = makePass(traces: [capture(magnitude: [point], finder: nil)], target: target)
         pass.setDraftName("   ")
         pass.storeTarget()
-        XCTAssertTrue(pass.state.presets.isEmpty)
+        XCTAssertEqual(Set(pass.state.presets.map(\.name)), BuiltInTargets.names)
         pass.setDraftName("Main target")
         pass.storeTarget()
-        XCTAssertEqual(pass.state.presets.first?.kind, .target)
+        XCTAssertEqual(pass.state.presets.first { $0.name == "Main target" }?.kind, .target)
         pass.storeTrace()
         XCTAssertEqual(pass.state.notice, .noSmaartTrace)
         try prepare(pass, points: [point])
@@ -118,6 +118,6 @@ final class PassReadTests: XCTestCase {
         pass.setDraftName("Missing")
         pass.storeTarget()
         XCTAssertEqual(pass.state.notice, .noSmaartTarget)
-        XCTAssertTrue(pass.state.presets.isEmpty)
+        XCTAssertEqual(Set(pass.state.presets.map(\.name)), BuiltInTargets.names)
     }
 }

@@ -28,13 +28,17 @@ final class ShellTests: XCTestCase {
         let (pass, _, _, _) = makePass(traces: [capture(magnitude: [point], finder: 12.35)])
         try prepare(pass, points: [point])
         let pick = PickView(controller: pass)
+        let settings = SettingsView(controller: pass)
         let delay = DelayView(controller: pass)
         let eq = EQView(controller: pass)
         let compare = CompareView(controller: pass)
         _ = pick.body
+        _ = settings.body
         _ = delay.body
         _ = eq.body
         _ = compare.body
+        XCTAssertTrue(pass.state.presets.map(\.name).contains("Flat"))
+        XCTAssertTrue(pass.state.presets.map(\.name).contains("Haystack"))
         pass.readTrace()
         let shell = ShellView(controller: pass)
         _ = shell.body

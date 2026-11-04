@@ -164,6 +164,32 @@ final class SessionTests: XCTestCase {
             XCTAssertEqual(error as? SmaartReaderError, .sessionClosed)
         }
     }
+
+    func testPreferredMeasurementNameOverridesActive() throws {
+        let measurements = #"{"response":{"transferFunctionMeasurements":[{"measurementName":"active-one","active":true},{"measurementName":"hi","active":false}]}}"#
+        let wire = ScriptedWire(replies: [
+            measurements,
+            measurements,
+            #"{"response":{"delay":1.5}}"#,
+            #"{"response":{"measurementName":"hi","data":[[500.0,-1.0]]}}"#
+        ])
+        let session = OfficialSmaartSession(wire: wire)
+        session.preferredMeasurementName = "hi"
+        try session.openSession()
+        let capture = try session.readTrace()
+        XCTAssertEqual(capture.delayFinderMs, 1.5)
+        XCTAssertEqual(capture.magnitude, [MagnitudePoint(hz: 500, db: -1, phase: 0)])
+        let sent = try wire.sent.map { try JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }
+        XCTAssertEqual(sent[2], JSONValue.object([
+            "action": .string("findDelay"),
+            "target": .object(["measurementName": .string("hi")]),
+            "properties": .array([
+                .object(["automaticallyStart": .bool(true)]),
+                .object(["automaticallyInsert": .bool(false)]),
+                .object(["automaticallyStop": .bool(true)])
+            ])
+        ]))
+    }
 }
 
 enum JSONValue: Equatable {

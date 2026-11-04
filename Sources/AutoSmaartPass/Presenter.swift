@@ -4,13 +4,17 @@ import AutoSmaartCore
 public enum PassPresenter {
     public static let pickTitle = "Pick output"
     public static let pickSupporting = "One Matrix output. One curve. The console is not written on this step."
+    public static let settingsTitle = "Settings"
+    public static let settingsSupporting = "Console OSC and which Smaart transfer function to read."
     public static let delayTitle = "Delay"
     public static let delaySupporting = "Smaart delay suggestion. Not from the target or the reference."
     public static let eqTitle = "EQ"
     public static let compareTitle = "Compare"
     public static let confirmWarning = "Nothing is sent until you confirm."
     public static let smaartLabel = "Smaart API"
-    public static let readTrace = "Read trace"
+    public static let readTrace = "Read"
+    public static let stop = "Stop"
+    public static let settings = "Settings"
     public static let storeTarget = "Store target"
     public static let storeTrace = "Store trace"
     public static let recall = "Recall"
@@ -21,6 +25,10 @@ public enum PassPresenter {
     public static let undoLastWrite = "Undo last write"
     public static let retryRemeasure = "Retry remeasure"
     public static let emDash = "—"
+
+    public static func smaartConnectionLine(live: Bool) -> String {
+        live ? "Smaart connected" : "Smaart not connected"
+    }
 
     public static func eqSupporting(bandCount: Int) -> String {
         if bandCount == 0 { return "No EQ is needed." }

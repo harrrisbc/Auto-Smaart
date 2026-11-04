@@ -1,4 +1,5 @@
 import SwiftUI
+import AutoSmaartCore
 import AutoSmaartPass
 
 public struct PickView: View {
@@ -14,34 +15,16 @@ public struct PickView: View {
             Text(PassPresenter.pickSupporting).font(.custom("Inter", size: 13)).foregroundStyle(Theme.secondary)
             HStack(alignment: .top, spacing: ThemeMetrics.groupGap) {
                 matrixTable
-                presetTable
-            }
-            HStack {
-                TextField("Console IP", text: host)
-                TextField("OSC port", text: port)
-                TextField("Name", text: draft)
-            }
-            .textFieldStyle(.plain)
-            .font(.custom("Inter", size: 13))
-            HStack {
-                QuietButton(title: PassPresenter.storeTarget) { controller.storeTarget() }
-                    .disabled(!PassPresenter.storeEnabled(controller.state))
-                QuietButton(title: PassPresenter.storeTrace) { controller.storeTrace() }
-                    .disabled(!PassPresenter.storeEnabled(controller.state))
-                QuietButton(title: PassPresenter.recall) { recallSelected() }
+                curveTable
             }
             Spacer()
         }
         .padding(ThemeMetrics.pagePadding)
     }
 
-    private var host: Binding<String> { Binding(get: { controller.state.host }, set: { controller.setHost($0) }) }
-    private var port: Binding<String> { Binding(get: { controller.state.port }, set: { controller.setPort($0) }) }
-    private var draft: Binding<String> { Binding(get: { controller.state.draftName }, set: { controller.setDraftName($0) }) }
-
     private var matrixTable: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header("Output", "Name", "Last write")
+            header("Matrix", "Name", "Last write")
             ForEach(controller.state.outputs, id: \.index) { row in
                 Button { controller.selectOutput(row.index) } label: {
                     HStack {
@@ -62,15 +45,15 @@ public struct PickView: View {
         }
     }
 
-    private var presetTable: some View {
+    private var curveTable: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header("Preset", "Type", "Source")
+            header("Curve", "Type", "Source")
             ForEach(controller.state.presets, id: \.name) { preset in
                 Button { controller.recall(name: preset.name) } label: {
                     HStack {
                         Text(preset.name).frame(maxWidth: .infinity, alignment: .leading)
                         Text(PassPresenter.kindLabel(preset.kind)).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(preset.kind == .target ? "Smaart target" : "Captured trace").frame(maxWidth: .infinity, alignment: .leading)
+                        Text(curveSource(preset)).frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .font(.custom("Inter", size: 13))
                     .frame(height: ThemeMetrics.row)
@@ -79,6 +62,11 @@ public struct PickView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private func curveSource(_ preset: CurvePreset) -> String {
+        if BuiltInTargets.names.contains(preset.name) { return "Built-in" }
+        return preset.kind == .target ? "Stored target" : "Captured trace"
     }
 
     private func header(_ a: String, _ b: String, _ c: String) -> some View {
@@ -98,9 +86,5 @@ public struct PickView: View {
             get: { controller.state.outputs[index - 1].displayName },
             set: { controller.setDisplayName($0, output: index) }
         )
-    }
-
-    private func recallSelected() {
-        if let name = controller.state.passPresetName { controller.recall(name: name) }
     }
 }

@@ -13,6 +13,8 @@ public protocol SmaartReader: AnyObject {
     func openSession() throws
     func closeSession()
     var isSessionOpen: Bool { get }
+    /// When non-empty after trim, read this TF name; when blank, use the first active TF.
+    var preferredMeasurementName: String { get set }
     func readTrace() throws -> SmaartCapture
     func readTargetCurve() throws -> [MagnitudePoint]
 }
@@ -83,6 +85,7 @@ public final class URLSessionSmaartWire: SmaartWire {
 public final class OfficialSmaartSession: SmaartReader {
     private let wire: SmaartWire
     public private(set) var isSessionOpen = false
+    public var preferredMeasurementName = ""
 
     public init(wire: SmaartWire) { self.wire = wire }
 
@@ -114,12 +117,25 @@ public final class OfficialSmaartSession: SmaartReader {
         guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
         let measurements = try request(["action": "get", "target": "measurements"])
         let rows = measurements["transferFunctionMeasurements"] as? [[String: Any]] ?? []
-        // Prefer the active TF; live v9 still exposes named rows when inactive (streamEndpoint
-        // only appears while active). Fall back to the first named TF so a paused "hi" still reads.
-        guard let row = rows.first(where: { isActiveFlag($0["active"]) })
-                ?? rows.first(where: { ($0["measurementName"] as? String)?.isEmpty == false }),
-              let name = row["measurementName"] as? String else {
-            throw SmaartReaderError.noTrace
+        let preferred = preferredMeasurementName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let row: [String: Any]
+        let name: String
+        if !preferred.isEmpty {
+            guard let match = rows.first(where: { ($0["measurementName"] as? String) == preferred }),
+                  let matchedName = match["measurementName"] as? String else {
+                throw SmaartReaderError.noTrace
+            }
+            row = match
+            name = matchedName
+        } else {
+            // Prefer the active TF; fall back to the first named TF when paused.
+            guard let match = rows.first(where: { isActiveFlag($0["active"]) })
+                    ?? rows.first(where: { ($0["measurementName"] as? String)?.isEmpty == false }),
+                  let matchedName = match["measurementName"] as? String else {
+                throw SmaartReaderError.noTrace
+            }
+            row = match
+            name = matchedName
         }
         let finderReply = try request([
             "action": "findDelay",

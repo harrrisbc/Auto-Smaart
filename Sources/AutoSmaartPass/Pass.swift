@@ -4,7 +4,7 @@ import AutoSmaartCore
 import ConsoleOSC
 import SmaartAPI
 
-public enum PassStep: Equatable { case pick, delay, eq, compare }
+public enum PassStep: Equatable { case pick, settings, delay, eq, compare }
 
 public enum PassNotice: Equatable {
     case none
@@ -24,6 +24,8 @@ public struct PassState: Equatable {
     public var host = ""
     public var port = ""
     public var draftName = ""
+    /// Optional Smaart TF measurement name (e.g. "hi"). Blank → first active TF.
+    public var transferFunctionName = ""
     public var selectedOutput: Int?
     public var passPresetName: String?
     public var outputs: [MatrixOutputRecord] = []
@@ -62,7 +64,7 @@ public final class PassController: ObservableObject {
         self.bank = bank
         self.outputs = outputs
         var initial = PassState()
-        initial.presets = bank.presets
+        initial.presets = BuiltInTargets.merge(bank: bank.presets)
         initial.outputs = outputs.outputs
         initial.smaartLive = reader.isSessionOpen
         state = initial
@@ -71,18 +73,26 @@ public final class PassController: ObservableObject {
     public func setHost(_ host: String) { state.host = host; endpoint?.update(host: state.host, port: state.port) }
     public func setPort(_ port: String) { state.port = port; endpoint?.update(host: state.host, port: state.port) }
     public func setDraftName(_ name: String) { state.draftName = name }
+    public func setTransferFunctionName(_ name: String) {
+        state.transferFunctionName = name
+        reader.preferredMeasurementName = name
+    }
 
     public func refreshSessionFlag() { state.smaartLive = reader.isSessionOpen }
 
     func reloadFromStores() {
         try? bank.reload()
-        state.presets = bank.presets
+        state.presets = BuiltInTargets.merge(bank: bank.presets)
         state.outputs = outputs.outputs
     }
 
     func storePreparedPreset(name: String, kind: CurveKind, points: [MagnitudePoint]) throws {
         try bank.store(name: name, kind: kind, points: points)
-        state.presets = bank.presets
+        state.presets = BuiltInTargets.merge(bank: bank.presets)
+    }
+
+    private func syncPresetList() {
+        state.presets = BuiltInTargets.merge(bank: bank.presets)
     }
 
     public func selectOutput(_ index: Int) {
@@ -110,7 +120,7 @@ public final class PassController: ObservableObject {
         do {
             let points = try reader.readTargetCurve()
             try bank.store(name: state.draftName, kind: .target, points: points)
-            state.presets = bank.presets
+            syncPresetList()
             state.notice = .none
         } catch is CurveBankError {
             return
@@ -126,14 +136,25 @@ public final class PassController: ObservableObject {
         }
         do {
             try bank.store(name: state.draftName, kind: .reference, points: latest)
-            state.presets = bank.presets
+            syncPresetList()
             state.notice = .none
         } catch {
             return
         }
     }
 
+    public func stop() {
+        reader.closeSession()
+        state.smaartLive = false
+        clearPassProgress()
+    }
+
     public func readTrace() {
+        if !reader.isSessionOpen {
+            try? reader.openSession()
+            refreshSessionFlag()
+        }
+        reader.preferredMeasurementName = state.transferFunctionName
         guard state.selectedOutput != nil, reader.isSessionOpen else { return }
         let capture: SmaartCapture
         do {
@@ -171,12 +192,12 @@ public final class PassController: ObservableObject {
     }
 
     public func back() {
-        if state.step == .delay { state.step = .pick }
+        if state.step == .delay || state.step == .settings { state.step = .pick }
     }
 
     public func canOpen(_ step: PassStep) -> Bool {
         switch step {
-        case .pick: return true
+        case .pick, .settings: return true
         case .delay: return state.suggestionRaw != nil
         case .eq: return state.bands != nil
         case .compare: return state.compareOpen
