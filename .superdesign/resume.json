@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/ring-out/setup": {
+      "targetKind": "new-ui",
+      "projectId": "a36aa012-7624-4dc3-90d1-a282bfc35ec3",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "68616d5b96db4fed63efb1cd67e6c3074c710c326cc8ec8344de8384fac9dc8c"
+      },
+      "components": [],
+      "sourceDraftId": "7fe90f16-6e82-40b4-9935-f03666de5f79",
+      "updatedAt": "2026-11-04T15:45:33Z",
+      "activeDraftId": "68fc275e-cc80-45cf-92b0-1b619a8a5fb4",
+      "drafts": {
+        "68fc275e-cc80-45cf-92b0-1b619a8a5fb4": {
+          "title": "Ring Out \u2014 Setup",
+          "visualDirection": "shared mode shell + neural-noir",
+          "currentVersion": 3
+        }
+      }
+    },
+    "/ring-out/running": {
+      "targetKind": "new-ui",
+      "projectId": "a36aa012-7624-4dc3-90d1-a282bfc35ec3",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "68616d5b96db4fed63efb1cd67e6c3074c710c326cc8ec8344de8384fac9dc8c"
+      },
+      "components": [],
+      "sourceDraftId": "7fe90f16-6e82-40b4-9935-f03666de5f79",
+      "updatedAt": "2026-11-04T15:45:33Z",
+      "activeDraftId": "ce3fdd36-dcb3-40af-bcaa-4ea0ece5f9db",
+      "drafts": {
+        "ce3fdd36-dcb3-40af-bcaa-4ea0ece5f9db": {
+          "title": "Ring Out \u2014 Running",
+          "visualDirection": "shared mode shell + neural-noir",
+          "currentVersion": 3,
+          "parentDraftId": "68fc275e-cc80-45cf-92b0-1b619a8a5fb4"
+        }
+      }
+    },
+    "/ring-out/notch": {
+      "targetKind": "new-ui",
+      "projectId": "a36aa012-7624-4dc3-90d1-a282bfc35ec3",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "68616d5b96db4fed63efb1cd67e6c3074c710c326cc8ec8344de8384fac9dc8c"
+      },
+      "components": [],
+      "sourceDraftId": "7fe90f16-6e82-40b4-9935-f03666de5f79",
+      "updatedAt": "2026-11-04T15:45:33Z",
+      "activeDraftId": "513a0e55-c0b6-41cb-85c4-5f69a1775868",
+      "drafts": {
+        "513a0e55-c0b6-41cb-85c4-5f69a1775868": {
+          "title": "Ring Out \u2014 Notch Applied",
+          "visualDirection": "shared mode shell + neural-noir",
+          "currentVersion": 3,
+          "parentDraftId": "68fc275e-cc80-45cf-92b0-1b619a8a5fb4"
+        }
+      }
+    },
+    "/ring-out/done": {
+      "targetKind": "new-ui",
+      "projectId": "a36aa012-7624-4dc3-90d1-a282bfc35ec3",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "68616d5b96db4fed63efb1cd67e6c3074c710c326cc8ec8344de8384fac9dc8c"
+      },
+      "components": [],
+      "sourceDraftId": "7fe90f16-6e82-40b4-9935-f03666de5f79",
+      "updatedAt": "2026-11-04T15:45:33Z",
+      "activeDraftId": "f549b33e-8620-4c65-bea9-33bfe3009f03",
+      "drafts": {
+        "f549b33e-8620-4c65-bea9-33bfe3009f03": {
+          "title": "Ring Out \u2014 Done",
+          "visualDirection": "shared mode shell + neural-noir",
+          "currentVersion": 3,
+          "parentDraftId": "68fc275e-cc80-45cf-92b0-1b619a8a5fb4"
+        }
+      }
+    },
+    "/calibration/pick": {
+      "targetKind": "existing-ui",
+      "projectId": "a36aa012-7624-4dc3-90d1-a282bfc35ec3",
+      "activeDraftId": "7fe90f16-6e82-40b4-9935-f03666de5f79",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "68616d5b96db4fed63efb1cd67e6c3074c710c326cc8ec8344de8384fac9dc8c"
+      },
+      "components": [],
+      "drafts": {
+        "7fe90f16-6e82-40b4-9935-f03666de5f79": {
+          "title": "Auto-Smaart \u2014 Pick Output",
+          "visualDirection": "shared mode shell",
+          "currentVersion": 3
+        }
+      },
+      "updatedAt": "2026-11-04T15:45:33Z"
+    }
+  }
+}
