@@ -24,7 +24,7 @@ let package = Package(
             sources: ["AutoSmaartCoreTests"],
             resources: [.process("Fixtures")]
         ),
-        .testTarget(name: "SmaartAPITests", dependencies: ["SmaartAPI"]),
+        .testTarget(name: "SmaartAPITests", dependencies: ["SmaartAPI", "AutoSmaartCore"]),
         .testTarget(name: "ConsoleOSCTests", dependencies: ["ConsoleOSC", "AutoSmaartCore"]),
         .testTarget(name: "HardwareTests", dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"])
     ]

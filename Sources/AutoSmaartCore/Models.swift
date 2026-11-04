@@ -11,15 +11,24 @@ public struct MagnitudePoint: Equatable, Codable {
     }
 }
 
-struct Impulse: Equatable, Codable {
-    var sampleRate: Double
-    var samples: [Double]
+public struct Impulse: Equatable, Codable {
+    public var sampleRate: Double
+    public var samples: [Double]
+    public init(sampleRate: Double, samples: [Double]) {
+        self.sampleRate = sampleRate
+        self.samples = samples
+    }
 }
 
-struct SmaartCapture: Equatable, Codable {
-    var magnitude: [MagnitudePoint]
-    var delayFinderMs: Double?
-    var impulse: Impulse?
+public struct SmaartCapture: Equatable, Codable {
+    public var magnitude: [MagnitudePoint]
+    public var delayFinderMs: Double?
+    public var impulse: Impulse?
+    public init(magnitude: [MagnitudePoint], delayFinderMs: Double?, impulse: Impulse?) {
+        self.magnitude = magnitude
+        self.delayFinderMs = delayFinderMs
+        self.impulse = impulse
+    }
 }
 
 public enum CurveKind: String, Equatable, Codable {
