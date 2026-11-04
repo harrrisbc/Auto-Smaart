@@ -114,7 +114,10 @@ public final class OfficialSmaartSession: SmaartReader {
         guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
         let measurements = try request(["action": "get", "target": "measurements"])
         let rows = measurements["transferFunctionMeasurements"] as? [[String: Any]] ?? []
-        guard let row = rows.first(where: { isActiveFlag($0["active"]) }),
+        // Prefer the active TF; live v9 still exposes named rows when inactive (streamEndpoint
+        // only appears while active). Fall back to the first named TF so a paused "hi" still reads.
+        guard let row = rows.first(where: { isActiveFlag($0["active"]) })
+                ?? rows.first(where: { ($0["measurementName"] as? String)?.isEmpty == false }),
               let name = row["measurementName"] as? String else {
             throw SmaartReaderError.noTrace
         }
@@ -135,7 +138,10 @@ public final class OfficialSmaartSession: SmaartReader {
         if magnitude.isEmpty {
             magnitude = magnitudeFromPairData(body["data"])
         }
-        if magnitude.isEmpty, let endpoint = row["streamEndpoint"] as? String {
+        if magnitude.isEmpty {
+            // Active rows include streamEndpoint; inactive rows omit it — build the known path.
+            let endpoint = (row["streamEndpoint"] as? String)
+                ?? "/api/v4/measurements/\(name)"
             let frame = try receiveStreamFrame(path: endpoint)
             magnitude = magnitudeFromPairData(frame["data"])
         }

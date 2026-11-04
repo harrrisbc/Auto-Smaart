@@ -138,6 +138,26 @@ final class SessionTests: XCTestCase {
         ])
     }
 
+    func testLiveV9InactiveNamedTFStillReadsInlineData() throws {
+        // Live list omits streamEndpoint while inactive; get-by-name is metadata-only, but
+        // fixtures may still inline `data`. Prefer named TF when nothing is active.
+        let measurements = #"{"response":{"transferFunctionMeasurements":[{"measurementName":"hi","active":false,"trackingDelay":false}]}}"#
+        let wire = ScriptedWire(replies: [
+            measurements,
+            measurements,
+            #"{"response":{"delay":0}}"#,
+            #"{"response":{"measurementName":"hi","active":false,"data":[[100.0,-12.5],[1000.0,3.2]]}}"#
+        ])
+        let session = OfficialSmaartSession(wire: wire)
+        try session.openSession()
+        let capture = try session.readTrace()
+        XCTAssertEqual(capture.delayFinderMs, 0)
+        XCTAssertEqual(capture.magnitude, [
+            MagnitudePoint(hz: 100, db: -12.5, phase: 0),
+            MagnitudePoint(hz: 1000, db: 3.2, phase: 0)
+        ])
+    }
+
     func testReadBeforeOpenThrowsSessionClosed() {
         let session = OfficialSmaartSession(wire: ScriptedWire(replies: []))
         XCTAssertThrowsError(try session.readTrace()) { error in
