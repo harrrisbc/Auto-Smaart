@@ -1,0 +1,5 @@
+{
+  "magnitude": [{"hz": 500.0, "db": 1.0, "phase": 4.0}],
+  "delayFinderMs": null,
+  "impulse": null
+}

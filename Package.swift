@@ -16,7 +16,14 @@ let package = Package(
             dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"],
             resources: [.process("Resources")]
         ),
-        .testTarget(name: "AutoSmaartCoreTests", dependencies: ["AutoSmaartCore"], resources: [.process("../Fixtures")]),
+        .testTarget(
+            name: "AutoSmaartCoreTests",
+            dependencies: ["AutoSmaartCore"],
+            path: "Tests",
+            exclude: ["SmaartAPITests", "ConsoleOSCTests", "HardwareTests"],
+            sources: ["AutoSmaartCoreTests"],
+            resources: [.process("Fixtures")]
+        ),
         .testTarget(name: "SmaartAPITests", dependencies: ["SmaartAPI"]),
         .testTarget(name: "ConsoleOSCTests", dependencies: ["ConsoleOSC", "AutoSmaartCore"]),
         .testTarget(name: "HardwareTests", dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC"])
