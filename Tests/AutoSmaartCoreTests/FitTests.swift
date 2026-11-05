@@ -44,17 +44,12 @@ final class FitTests: XCTestCase {
         guard case .bands(let bands) = fitEq(measurement: fixture.measurement, preset: fixture.preset) else {
             return XCTFail("expected bands")
         }
-        XCTAssertEqual(bands.count, 8)
+        // One peaking cut clears the +6 dB bin; unused bands stay empty.
+        XCTAssertEqual(bands.count, 1)
         XCTAssertEqual(bands[0].index, 1)
         XCTAssertEqual(bands[0].hz, 100, accuracy: 1e-9)
         XCTAssertEqual(bands[0].gainDb, -6.0, accuracy: 1e-9)
         XCTAssertEqual(bands[0].q, 4.0, accuracy: 1e-9)
-        XCTAssertEqual(bands[1].hz, 100, accuracy: 1e-9)
-        XCTAssertEqual(bands[1].gainDb, -12.0, accuracy: 1e-9)
-        XCTAssertEqual(bands[1].q, 4.0, accuracy: 1e-9)
-        XCTAssertEqual(bands[2].gainDb, -18.0, accuracy: 1e-9)
-        XCTAssertEqual(bands[7].gainDb, -18.0, accuracy: 1e-9)
-        XCTAssertEqual(bands[7].index, 8)
     }
 
     func testTieGoesToTheLowerFrequencyAndLobeSetsQ() {
@@ -66,8 +61,41 @@ final class FitTests: XCTestCase {
         guard case .bands(let bands) = fitEq(measurement: measurement, preset: preset) else { return XCTFail("expected bands") }
         XCTAssertEqual(bands[0].hz, 200, accuracy: 1e-9)
         XCTAssertEqual(bands[0].gainDb, -3.0, accuracy: 1e-9)
-        XCTAssertEqual(bands[0].q, 0.67, accuracy: 1e-9)
-        XCTAssertEqual(bands.count, 8)
+        // Opposite-sign bins are separate lobes, so each single-bin lobe uses Q 4.
+        XCTAssertEqual(bands[0].q, 4.0, accuracy: 1e-9)
+        // Separate dip at 800 Hz still gets its own band; no stacking beyond that.
+        XCTAssertEqual(bands.count, 2)
+        XCTAssertEqual(bands[1].hz, 800, accuracy: 1e-9)
+        XCTAssertEqual(bands[1].gainDb, 3.0, accuracy: 1e-9)
+    }
+
+    func testBroadLowRiseUsesOneBand() {
+        // Trace sits above a flat target only in the lows, then flat — one broad cut.
+        let frequencies: [Double] = [
+            40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 800, 1000, 2000, 4000, 8000
+        ]
+        let measurement = frequencies.map { hz -> MagnitudePoint in
+            let db: Double
+            if hz <= 80 {
+                db = 4
+            } else if hz < 250 {
+                db = 4 * (1 - log(hz / 80) / log(250.0 / 80.0))
+            } else {
+                db = 0
+            }
+            return MagnitudePoint(hz: hz, db: db, phase: 0)
+        }
+        let preset = [
+            MagnitudePoint(hz: 20, db: 0, phase: 0),
+            MagnitudePoint(hz: 20000, db: 0, phase: 0)
+        ]
+        guard case .bands(let bands) = fitEq(measurement: measurement, preset: preset) else {
+            return XCTFail("expected bands")
+        }
+        XCTAssertEqual(bands.count, 1, "broad low-only rise must not burn all 8 bands")
+        XCTAssertLessThan(bands[0].hz, 250)
+        XCTAssertLessThan(bands[0].gainDb, -1)
+        XCTAssertLessThan(bands[0].q, 4)
     }
 
     func testPhaseDoesNotChangeTheBands() throws {

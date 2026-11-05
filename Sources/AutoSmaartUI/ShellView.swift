@@ -109,9 +109,11 @@ public struct ShellView: View {
     private var graph: some View {
         let trace = PassPresenter.magnitudeTrace(controller.state)
         let bands = PassPresenter.graphBands(controller.state)
+        let target = PassPresenter.selectedTarget(controller.state)
         return MagnitudePlot(
             before: trace,
             after: controller.state.afterCurve,
+            target: target,
             bands: bands
         )
         .padding(12)

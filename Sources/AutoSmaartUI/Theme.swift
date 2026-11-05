@@ -39,6 +39,8 @@ public enum Theme {
     static let afterTrace = Color(hex: 0xe8d5b7)
     static let eqHex = "5eead4"
     static let eqTrace = Color(hex: 0x5eead4)
+    static let targetHex = "7dd3fc"
+    static let targetTrace = Color(hex: 0x7dd3fc)
 
     static func registerFonts() {
         // Do not touch Bundle.module — SPM's accessor fatalErrors when the resource

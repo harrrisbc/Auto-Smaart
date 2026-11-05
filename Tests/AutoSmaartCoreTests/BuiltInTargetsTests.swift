@@ -17,6 +17,9 @@ final class BuiltInTargetsTests: XCTestCase {
         let speech = BuiltInTargets.presets[1].points
         XCTAssertLessThan(speech.first { $0.hz == 50 }?.db ?? 0, -2)
         XCTAssertGreaterThan(speech.first { $0.hz == 1000 }?.db ?? -10, -1)
+        let speechMid = speech.first { $0.hz == 1000 }?.db ?? 0
+        let speechHigh = speech.first { $0.hz == 10000 }?.db ?? 0
+        XCTAssertGreaterThan(speechHigh - speechMid, 3, "Speech must raise the highs, not sit flat on top")
 
         let music = BuiltInTargets.presets[2].points
         XCTAssertGreaterThan(music.first { $0.hz == 50 }?.db ?? 0, 2)

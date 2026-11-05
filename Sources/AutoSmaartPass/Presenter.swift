@@ -52,6 +52,12 @@ public enum PassPresenter {
         state.postDelayMagnitude ?? state.latestMagnitude ?? []
     }
 
+    /// Points for the currently selected preset, drawn on the magnitude plot.
+    public static func selectedTarget(_ state: PassState) -> [MagnitudePoint] {
+        guard let name = state.passPresetName else { return [] }
+        return state.presets.first(where: { $0.name == name })?.points ?? []
+    }
+
     public static func noticeText(_ notice: PassNotice) -> String? {
         switch notice {
         case .none: return nil

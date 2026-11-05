@@ -4,35 +4,53 @@ import AutoSmaartCore
 public struct MagnitudePlot: View {
     var before: [MagnitudePoint]
     var after: [MagnitudePoint]?
+    /// Selected target curve, drawn in its own color for comparison.
+    var target: [MagnitudePoint]
     /// In-use peaking bands only; unused slots stay undrawn.
     var bands: [EqBand]
+
+    /// Fixed display window: +10 dB at the top, −10 dB at the bottom.
+    private static let displayHigh = 10.0
+    private static let displayLow = -10.0
 
     @State private var hoverBand: EqBand?
     @State private var hoverPoint: CGPoint = .zero
 
-    public init(before: [MagnitudePoint], after: [MagnitudePoint]?, bands: [EqBand] = []) {
+    public init(
+        before: [MagnitudePoint],
+        after: [MagnitudePoint]?,
+        target: [MagnitudePoint] = [],
+        bands: [EqBand] = []
+    ) {
         self.before = before
         self.after = after
+        self.target = target
         self.bands = bands
     }
 
     public var body: some View {
+        let offset = traceCenterOffset(before)
+        let centeredBefore = shift(before, by: -offset)
+        let centeredAfter = after.map { shift($0, by: -offset) }
+        let centeredTarget = shift(target, by: -offset)
         let bandCurves = bands.map { band in
             (band: band, points: summedEqResponse(bands: [band]))
         }
-        let scale = bounds([before, after ?? []] + bandCurves.map(\.points))
+        let low = Self.displayLow
+        let high = Self.displayHigh
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
                 Canvas { context, size in
-                    strokeGrid(context, size, low: scale.0, high: scale.1)
-                    stroke(context, size, before, Theme.beforeTrace, low: scale.0, high: scale.1)
-                    if let after {
-                        stroke(context, size, after, Theme.afterTrace, low: scale.0, high: scale.1)
+                    strokeGrid(context, size, low: low, high: high)
+                    stroke(context, size, centeredBefore, Theme.beforeTrace, low: low, high: high)
+                    if let centeredAfter {
+                        stroke(context, size, centeredAfter, Theme.afterTrace, low: low, high: high)
                     }
+                    stroke(context, size, centeredTarget, Theme.targetTrace, low: low, high: high)
                     for entry in bandCurves {
                         let color = BandPalette.color(for: entry.band.index)
-                        stroke(context, size, entry.points, color, low: scale.0, high: scale.1)
-                        markCenter(context, size, band: entry.band, color: color, low: scale.0, high: scale.1)
+                        stroke(context, size, entry.points, color, low: low, high: high)
+                        markCenter(context, size, band: entry.band, color: color, low: low, high: high)
                     }
                 }
                 .onContinuousHover { phase in
@@ -43,8 +61,8 @@ public struct MagnitudePlot: View {
                             at: location,
                             size: geo.size,
                             curves: bandCurves,
-                            low: scale.0,
-                            high: scale.1
+                            low: low,
+                            high: high
                         )
                     case .ended:
                         hoverBand = nil
@@ -66,14 +84,23 @@ public struct MagnitudePlot: View {
             HStack(spacing: 12) {
                 legend(Theme.beforeTrace, "Trace")
                 if after != nil { legend(Theme.afterTrace, "After") }
+                if target.count > 1 { legend(Theme.targetTrace, "Target") }
                 ForEach(bands, id: \.index) { band in
                     legend(BandPalette.color(for: band.index), "B\(band.index)")
                 }
             }
             .padding(8)
         }
+        .overlay(alignment: .topLeading) {
+            Text("+10 dB")
+                .font(.custom("Inter", size: 11))
+                .foregroundStyle(Theme.dim)
+                .padding(8)
+        }
         .overlay(alignment: .bottomLeading) {
             HStack {
+                Text("−10 dB")
+                Spacer()
                 Text("20 Hz")
                 Spacer()
                 Text("20 kHz")
@@ -81,7 +108,19 @@ public struct MagnitudePlot: View {
             .font(.custom("Inter", size: 11))
             .foregroundStyle(Theme.dim)
             .padding(.horizontal, 4)
+            .padding(.bottom, 4)
         }
+    }
+
+    /// Mean level of the input trace — shifted to 0 so the trace sits at vertical center.
+    private func traceCenterOffset(_ points: [MagnitudePoint]) -> Double {
+        let values = points.filter { $0.hz >= 20 && $0.hz <= 20000 }.map(\.db)
+        guard !values.isEmpty else { return 0 }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    private func shift(_ points: [MagnitudePoint], by delta: Double) -> [MagnitudePoint] {
+        points.map { MagnitudePoint(hz: $0.hz, db: $0.db + delta, phase: $0.phase) }
     }
 
     private func legend(_ color: Color, _ title: String) -> some View {
@@ -89,16 +128,6 @@ public struct MagnitudePlot: View {
             RoundedRectangle(cornerRadius: 1).fill(color).frame(width: 14, height: 2)
             Text(title).font(.custom("Inter", size: 11)).foregroundStyle(Theme.secondary)
         }
-    }
-
-    private func bounds(_ series: [[MagnitudePoint]]) -> (Double, Double) {
-        let values = series.flatMap { points in
-            points.filter { $0.hz >= 20 && $0.hz <= 20000 }.map(\.db)
-        }
-        let low = values.min() ?? -6
-        let high = values.max() ?? 6
-        if low == high { return (low - 3, high + 3) }
-        return (low, high)
     }
 
     private func strokeGrid(_ context: GraphicsContext, _ size: CGSize, low: Double, high: Double) {

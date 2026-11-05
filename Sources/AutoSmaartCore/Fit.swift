@@ -71,28 +71,92 @@ public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> Fi
     if deviation.isEmpty { return .noOverlap }
     if (deviation.map { abs($0.db) }.max() ?? 0) <= 1.0 { return .bands([]) }
     var bands: [EqBand] = []
+    // Bins already handled by a placed band's lobe stay claimed so residual
+    // peaking-vs-shelf mismatch does not spawn more bands on the same rise.
+    var claimed = Array(repeating: false, count: deviation.count)
     while bands.count < 8 {
-        let chosen = deviation.indices.max { lhs, rhs in
-            let left = abs(deviation[lhs].db)
-            let right = abs(deviation[rhs].db)
-            if left == right { return deviation[lhs].hz > deviation[rhs].hz }
-            return left < right
-        }!
+        guard let chosen = nextPeakIndex(deviation: deviation, claimed: claimed) else { break }
         let center = deviation[chosen]
         if abs(center.db) <= 1.0 { break }
+        if bands.contains(where: { bandCovers(hz: center.hz, band: $0) }) {
+            claimed[chosen] = true
+            continue
+        }
         let gain = roundHalfAwayFromZero(min(18.0, max(-18.0, -center.db)), places: 1)
         let half = abs(center.db) / 2.0
         var low = chosen
-        while low > 0 && abs(deviation[low - 1].db) >= half { low -= 1 }
+        while low > 0
+            && abs(deviation[low - 1].db) >= half
+            && deviation[low - 1].db * center.db > 0
+        {
+            low -= 1
+        }
         var high = chosen
-        while high < deviation.count - 1 && abs(deviation[high + 1].db) >= half { high += 1 }
+        while high < deviation.count - 1
+            && abs(deviation[high + 1].db) >= half
+            && deviation[high + 1].db * center.db > 0
+        {
+            high += 1
+        }
         let q = quality(lowHz: deviation[low].hz, highHz: deviation[high].hz)
+        // Own the whole same-sign rise above 1 dB so peaking residuals do not
+        // open more bands on an error one band already covers.
+        var claimLow = chosen
+        while claimLow > 0
+            && abs(deviation[claimLow - 1].db) > 1.0
+            && deviation[claimLow - 1].db * center.db > 0
+        {
+            claimLow -= 1
+        }
+        var claimHigh = chosen
+        while claimHigh < deviation.count - 1
+            && abs(deviation[claimHigh + 1].db) > 1.0
+            && deviation[claimHigh + 1].db * center.db > 0
+        {
+            claimHigh += 1
+        }
         bands.append(EqBand(index: bands.count + 1, hz: center.hz, gainDb: gain, q: q))
+        // Apply the peaking EQ response to the residual (gain is already signed).
         for index in deviation.indices {
-            deviation[index].db -= peakingMagnitudeDb(binHz: deviation[index].hz, centerHz: center.hz, gainDb: gain, q: q)
+            deviation[index].db += peakingMagnitudeDb(
+                binHz: deviation[index].hz,
+                centerHz: center.hz,
+                gainDb: gain,
+                q: q
+            )
+        }
+        for index in claimLow...claimHigh {
+            claimed[index] = true
         }
     }
     return .bands(bands)
+}
+
+/// Largest unclaimed |deviation|; ties go to the lower frequency.
+private func nextPeakIndex(deviation: [(hz: Double, db: Double)], claimed: [Bool]) -> Int? {
+    var best: Int?
+    for index in deviation.indices where !claimed[index] {
+        guard let current = best else {
+            best = index
+            continue
+        }
+        let left = abs(deviation[index].db)
+        let right = abs(deviation[current].db)
+        if left > right || (left == right && deviation[index].hz < deviation[current].hz) {
+            best = index
+        }
+    }
+    return best
+}
+
+/// True when `hz` sits inside the peaking band's effective coverage.
+func bandCovers(hz: Double, band: EqBand) -> Bool {
+    guard band.hz > 0, hz > 0, band.q > 0 else { return false }
+    let octaves = abs(log2(hz / band.hz))
+    // ~half the geometric bandwidth in octaves, with a floor so a broad cut
+    // still owns nearby bins after the peaking model leaves a small residual.
+    let halfBandwidthOctaves = max(0.5 / band.q, 0.25)
+    return octaves <= halfBandwidthOctaves
 }
 
 private func uniquePreset(_ preset: [MagnitudePoint]) -> [MagnitudePoint] {
