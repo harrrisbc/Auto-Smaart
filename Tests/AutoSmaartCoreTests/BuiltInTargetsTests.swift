@@ -16,14 +16,15 @@ final class BuiltInTargetsTests: XCTestCase {
         XCTAssertTrue(flat.allSatisfy { abs($0.db) < 1 })
 
         let speech = BuiltInTargets.presets[1].points
-        XCTAssertLessThan(speech.first { $0.hz == 50 }?.db ?? 0, -1, "Speech has less low end")
+        let speech50 = speech.first { $0.hz == 50 }?.db ?? 99
         let speech125 = speech.first { $0.hz == 125 }?.db ?? 99
         let speech1k = speech.first { $0.hz == 1000 }?.db ?? 99
         let speech8k = speech.first { $0.hz == 8000 }?.db ?? 99
         let speech16k = speech.first { $0.hz == 16000 }?.db ?? 99
+        XCTAssertEqual(speech50, speech125, accuracy: 1e-9, "no target gap below the fit band")
         XCTAssertLessThan(abs(speech1k - speech125), 1, "Speech stays flatter 125 Hz–8 kHz")
         XCTAssertLessThan(abs(speech8k - speech1k), 1)
-        XCTAssertLessThan(abs(speech16k - speech8k), 0.05, "Speech must not rise through the top octave")
+        XCTAssertEqual(speech16k, speech8k, accuracy: 1e-9, "no target gap in the top octave")
 
         let music = BuiltInTargets.presets[2].points
         XCTAssertGreaterThan(music.first { $0.hz == 50 }?.db ?? 0, 2)

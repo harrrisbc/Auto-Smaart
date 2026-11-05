@@ -35,17 +35,14 @@ public enum BuiltInTargets {
         0.15 * sin(log2(max(hz, 20) / 500) * .pi)
     }
 
-    /// Speech: less low end, flatter 125 Hz–8 kHz, no HF rise (intelligibility band).
+    /// Speech: flatter through 125 Hz–8 kHz. No drawn gap outside the fit band —
+    /// below 125 Hz and above 8 kHz hold the band-edge level so ignored regions
+    /// do not look like an EQ error.
     private static func speech(_ hz: Double) -> Double {
-        if hz < 125 {
-            // Less LF; settles to the flat speech band at 125 Hz.
-            return -3.5 * (1 - log(max(hz, 20) / 20) / log(125.0 / 20.0))
-        }
+        if hz < 125 { return speech(125) }
         if hz <= 8000 {
-            // Near-flat through the scored speech band.
             return 0.1 * sin(log2(hz / 500) * .pi)
         }
-        // Hold the 8 kHz level through the top octave — do not ask for more highs.
         return speech(8000)
     }
 

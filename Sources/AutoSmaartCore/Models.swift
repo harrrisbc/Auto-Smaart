@@ -47,16 +47,35 @@ public struct CurvePreset: Equatable, Codable {
     }
 }
 
+public enum EqShape: String, Equatable, Codable {
+    case peaking
+    case lowShelf
+}
+
 public struct EqBand: Equatable, Codable {
     public var index: Int
     public var hz: Double
     public var gainDb: Double
     public var q: Double
-    public init(index: Int, hz: Double, gainDb: Double, q: Double) {
+    public var shape: EqShape
+
+    public init(index: Int, hz: Double, gainDb: Double, q: Double, shape: EqShape = .peaking) {
         self.index = index
         self.hz = hz
         self.gainDb = gainDb
         self.q = q
+        self.shape = shape
+    }
+
+    private enum CodingKeys: String, CodingKey { case index, hz, gainDb, q, shape }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        index = try container.decode(Int.self, forKey: .index)
+        hz = try container.decode(Double.self, forKey: .hz)
+        gainDb = try container.decode(Double.self, forKey: .gainDb)
+        q = try container.decode(Double.self, forKey: .q)
+        shape = try container.decodeIfPresent(EqShape.self, forKey: .shape) ?? .peaking
     }
 }
 
