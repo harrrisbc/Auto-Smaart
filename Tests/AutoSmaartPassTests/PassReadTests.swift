@@ -114,7 +114,7 @@ final class PassReadTests: XCTestCase {
     }
 
     func testReadPreviewsBandsWithoutWriting() throws {
-        let loud = MagnitudePoint(hz: 100, db: 6, phase: 0)
+        let loud = MagnitudePoint(hz: 200, db: 6, phase: 0)
         let flat = [MagnitudePoint(hz: 20, db: 0, phase: 0), MagnitudePoint(hz: 20000, db: 0, phase: 0)]
         let (pass, _, link, _) = makePass(traces: [capture(magnitude: [loud], finder: 4)])
         try prepare(pass, points: flat)
