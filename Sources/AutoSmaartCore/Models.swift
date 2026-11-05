@@ -50,6 +50,7 @@ public struct CurvePreset: Equatable, Codable {
 public enum EqShape: String, Equatable, Codable {
     case peaking
     case lowShelf
+    case highShelf
 }
 
 public struct EqBand: Equatable, Codable {

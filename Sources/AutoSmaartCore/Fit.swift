@@ -55,12 +55,37 @@ func lowShelfMagnitudeDb(binHz: Double, cornerHz: Double, gainDb: Double) -> Dou
     )
 }
 
+/// RBJ high-shelf (S = 1). `cornerHz` is f0; `gainDb` is the shelf step that holds.
+func highShelfMagnitudeDb(binHz: Double, cornerHz: Double, gainDb: Double) -> Double {
+    let fs = 48000.0
+    let a = pow(10.0, gainDb / 40.0)
+    let omega0 = 2.0 * Double.pi * cornerHz / fs
+    let cosine = cos(omega0)
+    let sine = sin(omega0)
+    let alpha = sine / 2.0 * sqrt(2.0)
+    let twoSqrtAAlpha = 2.0 * sqrt(a) * alpha
+    let b0 = a * ((a + 1) + (a - 1) * cosine + twoSqrtAAlpha)
+    let b1 = -2 * a * ((a - 1) + (a + 1) * cosine)
+    let b2 = a * ((a + 1) + (a - 1) * cosine - twoSqrtAAlpha)
+    let a0 = (a + 1) - (a - 1) * cosine + twoSqrtAAlpha
+    let a1 = 2 * ((a - 1) - (a + 1) * cosine)
+    let a2 = (a + 1) - (a - 1) * cosine - twoSqrtAAlpha
+    return biquadMagnitudeDb(
+        binHz: binHz,
+        fs: fs,
+        b0: b0, b1: b1, b2: b2,
+        a0: a0, a1: a1, a2: a2
+    )
+}
+
 func bandMagnitudeDb(binHz: Double, band: EqBand) -> Double {
     switch band.shape {
     case .peaking:
         return peakingMagnitudeDb(binHz: binHz, centerHz: band.hz, gainDb: band.gainDb, q: band.q)
     case .lowShelf:
         return lowShelfMagnitudeDb(binHz: binHz, cornerHz: band.hz, gainDb: band.gainDb)
+    case .highShelf:
+        return highShelfMagnitudeDb(binHz: binHz, cornerHz: band.hz, gainDb: band.gainDb)
     }
 }
 
@@ -131,6 +156,12 @@ public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> Fi
             fullDeviation[index].db += bandMagnitudeDb(binHz: fullDeviation[index].hz, band: shelf)
         }
     }
+    if let shelf = detectHighShelf(in: fullDeviation, nextIndex: bands.count + 1) {
+        bands.append(shelf)
+        for index in fullDeviation.indices {
+            fullDeviation[index].db += bandMagnitudeDb(binHz: fullDeviation[index].hz, band: shelf)
+        }
+    }
 
     var deviation = fullDeviation.filter { $0.hz >= fitBandLowHz && $0.hz <= fitBandHighHz }
     if deviation.isEmpty {
@@ -149,9 +180,13 @@ public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> Fi
             claimed[chosen] = true
             continue
         }
-        // A peaking bell cannot follow a shelf across the low band — do not plant
-        // a narrow spike on the leftover knee when a shelf already owns the LF.
+        // A peaking bell cannot follow a shelf — do not plant a narrow spike on
+        // the leftover knee when a shelf already owns that end of the band.
         if bands.contains(where: { $0.shape == .lowShelf }) && center.hz < 250 {
+            claimed[chosen] = true
+            continue
+        }
+        if bands.contains(where: { $0.shape == .highShelf }) && center.hz > 1500 {
             claimed[chosen] = true
             continue
         }
@@ -234,6 +269,45 @@ func detectLowShelf(in deviation: [(hz: Double, db: Double)]) -> EqBand? {
     }
     corner = min(250.0, max(40.0, corner))
     return EqBand(index: 1, hz: roundHalfAwayFromZero(corner, places: 0), gainDb: gain, q: 0.71, shape: .lowShelf)
+}
+
+/// One high shelf when the HF error is a broad step that holds, not a resonance.
+func detectHighShelf(in deviation: [(hz: Double, db: Double)], nextIndex: Int) -> EqBand? {
+    let mids = deviation.filter { $0.hz >= 400 && $0.hz <= 1000 }
+    let highs = deviation.filter { $0.hz >= 4000 && $0.hz <= 8000 }
+    guard mids.count >= 2, highs.count >= 2 else { return nil }
+    let midMean = mids.map(\.db).reduce(0, +) / Double(mids.count)
+    let highMean = highs.map(\.db).reduce(0, +) / Double(highs.count)
+    let delta = highMean - midMean
+    guard abs(delta) > 1.5 else { return nil }
+    let midSpread = (mids.map(\.db).max() ?? 0) - (mids.map(\.db).min() ?? 0)
+    let highSpread = (highs.map(\.db).max() ?? 0) - (highs.map(\.db).min() ?? 0)
+    guard midSpread <= 3.0, highSpread <= 2.5 else { return nil }
+
+    let gain = roundHalfAwayFromZero(min(18.0, max(-18.0, -delta)), places: 1)
+    guard abs(gain) >= 1.5 else { return nil }
+
+    let halfLevel = midMean + delta / 2.0
+    let sorted = deviation.sorted { $0.hz < $1.hz }
+    var corner = 2000.0
+    for index in 0..<(sorted.count - 1) where sorted[index].hz >= 800 && sorted[index].hz <= 6000 {
+        let left = sorted[index]
+        let right = sorted[index + 1]
+        let crosses = (left.db - halfLevel) * (right.db - halfLevel) <= 0
+        if crosses && left.db != right.db {
+            let t = (halfLevel - left.db) / (right.db - left.db)
+            corner = left.hz * pow(right.hz / left.hz, t)
+            break
+        }
+    }
+    corner = min(6000.0, max(800.0, corner))
+    return EqBand(
+        index: nextIndex,
+        hz: roundHalfAwayFromZero(corner, places: 0),
+        gainDb: gain,
+        q: 0.71,
+        shape: .highShelf
+    )
 }
 
 /// Largest unclaimed |deviation|; ties go to the lower frequency.

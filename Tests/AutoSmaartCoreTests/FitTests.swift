@@ -90,19 +90,22 @@ final class FitTests: XCTestCase {
         XCTAssertFalse(bands.contains { $0.shape == .peaking })
     }
 
-    func testSpeechFlatTraceDoesNotChaseBelow125() {
+    func testSpeechFlatTraceGetsHighShelfThatHolds() {
         let frequencies: [Double] = [
-            20, 40, 80, 125, 250, 500, 1000, 2000, 4000, 8000, 16000
+            20, 40, 80, 125, 250, 400, 500, 800, 1000, 1600, 2000, 3150, 4000, 5000, 6300, 8000, 16000
         ]
         let measurement = frequencies.map { MagnitudePoint(hz: $0, db: 0, phase: 0) }
         let speech = BuiltInTargets.presets.first { $0.name == "Speech" }!.points
         guard case .bands(let bands) = fitEq(measurement: measurement, preset: speech) else {
             return XCTFail("expected bands")
         }
-        // Gentle HF rise vs a flat trace may need peaking in-band; never under 125 Hz.
+        // HF lift that plateaus must be one high shelf, not a bell that returns to 0.
+        XCTAssertEqual(bands.count, 1)
+        XCTAssertEqual(bands[0].shape, .highShelf)
+        XCTAssertGreaterThan(bands[0].gainDb, 1.5)
+        XCTAssertGreaterThan(bands[0].hz, 800)
+        XCTAssertFalse(bands.contains { $0.shape == .peaking })
         XCTAssertFalse(bands.contains { $0.hz < fitBandLowHz })
-        XCTAssertFalse(bands.contains { $0.shape == .lowShelf })
-        XCTAssertFalse(bands.contains { $0.hz > fitBandHighHz })
     }
 
     func testInBandSpeechGapStillFits() {

@@ -20,7 +20,9 @@ enum BandHoverText {
         let gainLabel = String(format: "%+.1f dB", gain)
         switch band.shape {
         case .lowShelf:
-            return "Shelf · \(formatFrequency(band.hz)) · \(gainLabel)"
+            return "LF shelf · \(formatFrequency(band.hz)) · \(gainLabel)"
+        case .highShelf:
+            return "HF shelf · \(formatFrequency(band.hz)) · \(gainLabel)"
         case .peaking:
             let qLabel = String(format: "Q %.2f", band.q)
             return "\(formatFrequency(band.hz)) · \(qLabel) · \(gainLabel)"
