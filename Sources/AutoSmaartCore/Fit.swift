@@ -24,6 +24,52 @@ func peakingMagnitudeDb(binHz: Double, centerHz: Double, gainDb: Double, q: Doub
     let a0 = 1.0 + alpha / a
     let a1 = -2.0 * cos(omega0)
     let a2 = 1.0 - alpha / a
+    return biquadMagnitudeDb(
+        binHz: binHz,
+        fs: fs,
+        b0: b0, b1: b1, b2: b2,
+        a0: a0, a1: a1, a2: a2
+    )
+}
+
+/// RBJ low-shelf (S = 1). `cornerHz` is f0; `gainDb` is the shelf step.
+func lowShelfMagnitudeDb(binHz: Double, cornerHz: Double, gainDb: Double) -> Double {
+    let fs = 48000.0
+    let a = pow(10.0, gainDb / 40.0)
+    let omega0 = 2.0 * Double.pi * cornerHz / fs
+    let cosine = cos(omega0)
+    let sine = sin(omega0)
+    let alpha = sine / 2.0 * sqrt(2.0)
+    let twoSqrtAAlpha = 2.0 * sqrt(a) * alpha
+    let b0 = a * ((a + 1) - (a - 1) * cosine + twoSqrtAAlpha)
+    let b1 = 2 * a * ((a - 1) - (a + 1) * cosine)
+    let b2 = a * ((a + 1) - (a - 1) * cosine - twoSqrtAAlpha)
+    let a0 = (a + 1) + (a - 1) * cosine + twoSqrtAAlpha
+    let a1 = -2 * ((a - 1) + (a + 1) * cosine)
+    let a2 = (a + 1) + (a - 1) * cosine - twoSqrtAAlpha
+    return biquadMagnitudeDb(
+        binHz: binHz,
+        fs: fs,
+        b0: b0, b1: b1, b2: b2,
+        a0: a0, a1: a1, a2: a2
+    )
+}
+
+func bandMagnitudeDb(binHz: Double, band: EqBand) -> Double {
+    switch band.shape {
+    case .peaking:
+        return peakingMagnitudeDb(binHz: binHz, centerHz: band.hz, gainDb: band.gainDb, q: band.q)
+    case .lowShelf:
+        return lowShelfMagnitudeDb(binHz: binHz, cornerHz: band.hz, gainDb: band.gainDb)
+    }
+}
+
+private func biquadMagnitudeDb(
+    binHz: Double,
+    fs: Double,
+    b0: Double, b1: Double, b2: Double,
+    a0: Double, a1: Double, a2: Double
+) -> Double {
     let omega = 2.0 * Double.pi * binHz / fs
     let cosine1 = cos(omega)
     let sine1 = sin(omega)
@@ -42,7 +88,7 @@ public func summedEqResponse(bands: [EqBand], at frequencies: [Double]) -> [Magn
     guard !bands.isEmpty else { return [] }
     return frequencies.map { hz in
         let db = bands.reduce(0.0) { partial, band in
-            partial + peakingMagnitudeDb(binHz: hz, centerHz: band.hz, gainDb: band.gainDb, q: band.q)
+            partial + bandMagnitudeDb(binHz: hz, band: band)
         }
         return MagnitudePoint(hz: hz, db: db, phase: 0)
     }
@@ -59,33 +105,53 @@ public func summedEqResponse(bands: [EqBand], samples: Int = 128) -> [MagnitudeP
     return summedEqResponse(bands: bands, at: frequencies)
 }
 
-/// Live-sound bells earn their place in the controlled band. Below ~125 Hz is
-/// coupling / subs; the top octave is air and coherence — neither is chased with peaking EQ.
+/// Live-sound peaking bells earn their place in the controlled band.
+/// Below ~125 Hz is coupling / a shelf job; the top octave is air / coherence.
 public let fitBandLowHz = 125.0
 public let fitBandHighHz = 8000.0
 
 public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> FitResult {
-    let bins = measurement
-        .filter { $0.hz >= fitBandLowHz && $0.hz <= fitBandHighHz }
-        .sorted { $0.hz < $1.hz }
     let presetPoints = uniquePreset(preset)
     guard let first = presetPoints.first, let last = presetPoints.last else { return .noOverlap }
-    var deviation: [(hz: Double, db: Double)] = []
-    for bin in bins {
+
+    let fullBins = measurement
+        .filter { $0.hz >= 20 && $0.hz <= 20000 }
+        .sorted { $0.hz < $1.hz }
+    var fullDeviation: [(hz: Double, db: Double)] = []
+    for bin in fullBins {
         guard let presetDb = interpolate(hz: bin.hz, preset: presetPoints, first: first.hz, last: last.hz) else { continue }
-        deviation.append((bin.hz, bin.db - presetDb))
+        fullDeviation.append((bin.hz, bin.db - presetDb))
     }
-    if deviation.isEmpty { return .noOverlap }
-    if (deviation.map { abs($0.db) }.max() ?? 0) <= 1.0 { return .bands([]) }
+    if fullDeviation.isEmpty { return .noOverlap }
+
     var bands: [EqBand] = []
-    // Bins already handled by a placed band's lobe stay claimed so residual
-    // peaking-vs-shelf mismatch does not spawn more bands on the same rise.
+    if let shelf = detectLowShelf(in: fullDeviation) {
+        bands.append(shelf)
+        for index in fullDeviation.indices {
+            fullDeviation[index].db += bandMagnitudeDb(binHz: fullDeviation[index].hz, band: shelf)
+        }
+    }
+
+    var deviation = fullDeviation.filter { $0.hz >= fitBandLowHz && $0.hz <= fitBandHighHz }
+    if deviation.isEmpty {
+        return bands.isEmpty ? .noOverlap : .bands(bands)
+    }
+    if (deviation.map { abs($0.db) }.max() ?? 0) <= 1.0 {
+        return .bands(bands)
+    }
+
     var claimed = Array(repeating: false, count: deviation.count)
     while bands.count < 8 {
         guard let chosen = nextPeakIndex(deviation: deviation, claimed: claimed) else { break }
         let center = deviation[chosen]
         if abs(center.db) <= 1.0 { break }
-        if bands.contains(where: { bandCovers(hz: center.hz, band: $0) }) {
+        if bands.contains(where: { $0.shape == .peaking && bandCovers(hz: center.hz, band: $0) }) {
+            claimed[chosen] = true
+            continue
+        }
+        // A peaking bell cannot follow a shelf across the low band — do not plant
+        // a narrow spike on the leftover knee when a shelf already owns the LF.
+        if bands.contains(where: { $0.shape == .lowShelf }) && center.hz < 250 {
             claimed[chosen] = true
             continue
         }
@@ -106,8 +172,6 @@ public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> Fi
             high += 1
         }
         let q = quality(lowHz: deviation[low].hz, highHz: deviation[high].hz)
-        // Own the whole same-sign rise above 1 dB so peaking residuals do not
-        // open more bands on an error one band already covers.
         var claimLow = chosen
         while claimLow > 0
             && abs(deviation[claimLow - 1].db) > 1.0
@@ -122,21 +186,54 @@ public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> Fi
         {
             claimHigh += 1
         }
-        bands.append(EqBand(index: bands.count + 1, hz: center.hz, gainDb: gain, q: q))
-        // Apply the peaking EQ response to the residual (gain is already signed).
+        let band = EqBand(
+            index: bands.count + 1,
+            hz: center.hz,
+            gainDb: gain,
+            q: q,
+            shape: .peaking
+        )
+        bands.append(band)
         for index in deviation.indices {
-            deviation[index].db += peakingMagnitudeDb(
-                binHz: deviation[index].hz,
-                centerHz: center.hz,
-                gainDb: gain,
-                q: q
-            )
+            deviation[index].db += bandMagnitudeDb(binHz: deviation[index].hz, band: band)
         }
         for index in claimLow...claimHigh {
             claimed[index] = true
         }
     }
     return .bands(bands)
+}
+
+/// One low shelf when the LF error is a broad step, not a resonance.
+func detectLowShelf(in deviation: [(hz: Double, db: Double)]) -> EqBand? {
+    let lows = deviation.filter { $0.hz <= 100 }
+    let mids = deviation.filter { $0.hz >= 400 && $0.hz <= 2000 }
+    guard lows.count >= 2, mids.count >= 2 else { return nil }
+    let lowMean = lows.map(\.db).reduce(0, +) / Double(lows.count)
+    let midMean = mids.map(\.db).reduce(0, +) / Double(mids.count)
+    let delta = lowMean - midMean
+    guard abs(delta) > 1.5 else { return nil }
+    let midSpread = (mids.map(\.db).max() ?? 0) - (mids.map(\.db).min() ?? 0)
+    guard midSpread <= 3.0 else { return nil }
+
+    let gain = roundHalfAwayFromZero(min(18.0, max(-18.0, -delta)), places: 1)
+    guard abs(gain) >= 1.5 else { return nil }
+
+    let halfLevel = midMean + delta / 2.0
+    let sorted = deviation.sorted { $0.hz < $1.hz }
+    var corner = 100.0
+    for index in 0..<(sorted.count - 1) where sorted[index].hz <= 400 {
+        let left = sorted[index]
+        let right = sorted[index + 1]
+        let crosses = (left.db - halfLevel) * (right.db - halfLevel) <= 0
+        if crosses && left.db != right.db {
+            let t = (halfLevel - left.db) / (right.db - left.db)
+            corner = left.hz * pow(right.hz / left.hz, t)
+            break
+        }
+    }
+    corner = min(250.0, max(40.0, corner))
+    return EqBand(index: 1, hz: roundHalfAwayFromZero(corner, places: 0), gainDb: gain, q: 0.71, shape: .lowShelf)
 }
 
 /// Largest unclaimed |deviation|; ties go to the lower frequency.
@@ -158,10 +255,8 @@ private func nextPeakIndex(deviation: [(hz: Double, db: Double)], claimed: [Bool
 
 /// True when `hz` sits inside the peaking band's effective coverage.
 func bandCovers(hz: Double, band: EqBand) -> Bool {
-    guard band.hz > 0, hz > 0, band.q > 0 else { return false }
+    guard band.shape == .peaking, band.hz > 0, hz > 0, band.q > 0 else { return false }
     let octaves = abs(log2(hz / band.hz))
-    // ~half the geometric bandwidth in octaves, with a floor so a broad cut
-    // still owns nearby bins after the peaking model leaves a small residual.
     let halfBandwidthOctaves = max(0.5 / band.q, 0.25)
     return octaves <= halfBandwidthOctaves
 }

@@ -330,7 +330,9 @@ extension PassController {
 
     public func confirmEq() {
         guard state.step == .eq, let bands = state.bands, let output = state.selectedOutput else { return }
-        if bands.isEmpty {
+        // Console writes stay peaking/bell. Suggested low shelves are drawn only.
+        let writeBands = bands.filter { $0.shape == .peaking }
+        if writeBands.isEmpty {
             state.beforeCurve = state.postDelayMagnitude
             state.afterCurve = state.postDelayMagnitude
             state.eqRemeasureFailed = false
@@ -343,7 +345,7 @@ extension PassController {
             return
         }
         var items: [Replacement] = []
-        for band in bands {
+        for band in writeBands {
             let addresses: (freq: String, gain: String, q: String, on: String)
             do { addresses = try eqAddresses(output: output, band: band.index) } catch { return }
             items.append(Replacement(address: addresses.freq, value: .float32(Float(band.hz))))
@@ -354,7 +356,7 @@ extension PassController {
         do {
             let restore = try confirmReplace(items, link: link)
             var snapshots: [EqBandSnapshot] = []
-            for (offset, band) in bands.enumerated() {
+            for (offset, band) in writeBands.enumerated() {
                 let base = offset * 4
                 snapshots.append(EqBandSnapshot(
                     index: band.index,

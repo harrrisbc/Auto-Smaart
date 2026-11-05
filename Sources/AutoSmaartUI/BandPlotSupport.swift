@@ -18,8 +18,13 @@ enum BandHoverText {
     static func readout(_ band: EqBand) -> String {
         let gain = roundHalfAwayFromZero(band.gainDb, places: 1)
         let gainLabel = String(format: "%+.1f dB", gain)
-        let qLabel = String(format: "Q %.2f", band.q)
-        return "\(formatFrequency(band.hz)) · \(qLabel) · \(gainLabel)"
+        switch band.shape {
+        case .lowShelf:
+            return "Shelf · \(formatFrequency(band.hz)) · \(gainLabel)"
+        case .peaking:
+            let qLabel = String(format: "Q %.2f", band.q)
+            return "\(formatFrequency(band.hz)) · \(qLabel) · \(gainLabel)"
+        }
     }
 }
 

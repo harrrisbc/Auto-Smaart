@@ -52,17 +52,67 @@ final class FitTests: XCTestCase {
         XCTAssertEqual(bands[0].q, 4.0, accuracy: 1e-9)
     }
 
-    func testFitIgnoresBelow125AndTopOctave() {
+    func testFitIgnoresBelow125AndTopOctaveWhenNotAShelf() {
+        // Mid is not flat (hot at 1 kHz), so this is not a shelf — and the
+        // out-of-band spikes must not become peaking bells.
         let measurement = [
             MagnitudePoint(hz: 40, db: 12, phase: 0),
-            MagnitudePoint(hz: 1000, db: 0.2, phase: 0),
+            MagnitudePoint(hz: 63, db: 12, phase: 0),
+            MagnitudePoint(hz: 1000, db: 6, phase: 0),
+            MagnitudePoint(hz: 2000, db: 0.2, phase: 0),
             MagnitudePoint(hz: 16000, db: 12, phase: 0)
         ]
         let preset = [
             MagnitudePoint(hz: 20, db: 0, phase: 0),
             MagnitudePoint(hz: 20000, db: 0, phase: 0)
         ]
-        XCTAssertEqual(fitEq(measurement: measurement, preset: preset), .bands([]))
+        guard case .bands(let bands) = fitEq(measurement: measurement, preset: preset) else {
+            return XCTFail("expected bands")
+        }
+        XCTAssertFalse(bands.contains { $0.shape == .lowShelf })
+        XCTAssertFalse(bands.contains { $0.hz < fitBandLowHz || $0.hz > fitBandHighHz })
+    }
+
+    func testMusicLowShelfIsOneShelfNotAKneeSpike() {
+        let frequencies: [Double] = [
+            20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500,
+            800, 1000, 2000, 4000, 8000, 16000
+        ]
+        let measurement = frequencies.map { MagnitudePoint(hz: $0, db: 0, phase: 0) }
+        let music = BuiltInTargets.presets.first { $0.name == "Music" }!.points
+        guard case .bands(let bands) = fitEq(measurement: measurement, preset: music) else {
+            return XCTFail("expected bands")
+        }
+        XCTAssertEqual(bands.count, 1)
+        XCTAssertEqual(bands[0].shape, .lowShelf)
+        XCTAssertGreaterThan(bands[0].gainDb, 1.5)
+        XCTAssertLessThan(bands[0].hz, 250)
+        XCTAssertFalse(bands.contains { $0.shape == .peaking })
+    }
+
+    func testSpeechFlatTraceNeedsNoEQWhenTargetHasNoIgnoredGap() {
+        let frequencies: [Double] = [
+            20, 40, 80, 125, 250, 500, 1000, 2000, 4000, 8000, 16000
+        ]
+        let measurement = frequencies.map { MagnitudePoint(hz: $0, db: 0, phase: 0) }
+        let speech = BuiltInTargets.presets.first { $0.name == "Speech" }!.points
+        XCTAssertEqual(fitEq(measurement: measurement, preset: speech), .bands([]))
+    }
+
+    func testInBandSpeechGapStillFits() {
+        let frequencies: [Double] = [
+            125, 160, 200, 250, 315, 400, 500, 800, 1000, 2000, 4000, 8000
+        ]
+        let measurement = frequencies.map { hz -> MagnitudePoint in
+            MagnitudePoint(hz: hz, db: hz == 1000 ? 4 : 0, phase: 0)
+        }
+        let speech = BuiltInTargets.presets.first { $0.name == "Speech" }!.points
+        guard case .bands(let bands) = fitEq(measurement: measurement, preset: speech) else {
+            return XCTFail("expected bands")
+        }
+        XCTAssertFalse(bands.isEmpty)
+        XCTAssertEqual(bands[0].shape, .peaking)
+        XCTAssertEqual(bands[0].hz, 1000, accuracy: 1)
     }
 
     func testTieGoesToTheLowerFrequencyAndLobeSetsQ() {
@@ -106,10 +156,9 @@ final class FitTests: XCTestCase {
             return XCTFail("expected bands")
         }
         XCTAssertEqual(bands.count, 1, "broad low-only rise must not burn all 8 bands")
-        XCTAssertGreaterThanOrEqual(bands[0].hz, fitBandLowHz)
+        XCTAssertEqual(bands[0].shape, .lowShelf, "a shelf-shaped low rise is one low shelf, not a knee spike")
         XCTAssertLessThanOrEqual(bands[0].hz, 250)
         XCTAssertLessThan(bands[0].gainDb, -1)
-        XCTAssertLessThanOrEqual(bands[0].q, 5)
     }
 
     func testPhaseDoesNotChangeTheBands() throws {
