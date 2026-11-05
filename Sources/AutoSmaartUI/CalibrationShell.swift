@@ -43,6 +43,8 @@ public struct CalibrationShell: View {
                 QuietButton(title: "Ring Out", action: onRingOut)
             }
             QuietButton(title: PassPresenter.settings) { openSettings() }
+            QuietButton(title: PassPresenter.mix) { controller.mixSelectedMatrix() }
+            QuietButton(title: PassPresenter.mute) { controller.muteSelectedMatrix() }
             QuietButton(title: PassPresenter.start) { controller.startGenerator() }
             QuietButton(title: PassPresenter.stop) { controller.stop() }
         }

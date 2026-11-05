@@ -15,6 +15,8 @@ public enum PassPresenter {
     public static let readTrace = "Read"
     public static let stop = "Stop"
     public static let start = "Start"
+    public static let mute = "Mute"
+    public static let mix = "Mix"
     public static let settings = "Settings"
     public static let storeTarget = "Store target"
     public static let storeTrace = "Store trace"
@@ -78,6 +80,8 @@ public enum PassPresenter {
         case .writeFailedMismatch: return "Write failed. Console may not match the previous value."
         case .noEqNeeded: return "No EQ is needed."
         case .noEqWritten: return "No EQ was written."
+        case .matrixMuteIncomplete: return "Mute failed. Check the console."
+        case .matrixMixIncomplete: return "Mix failed. Check the console."
         }
     }
 
