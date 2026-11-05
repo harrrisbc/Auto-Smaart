@@ -44,6 +44,8 @@ public struct PassState: Equatable {
     public var delayWrittenThisPass = false
     public var compareOpen = false
     public var eqRemeasureFailed = false
+    /// Per Matrix output index: how many successful Reads have captured a Smaart TF.
+    public var readCounts: [Int: Int] = [:]
 
     public init() {}
 }
@@ -187,6 +189,17 @@ public final class PassController: ObservableObject {
             return
         }
         state.latestMagnitude = capture.magnitude
+        if let output = state.selectedOutput {
+            let count = (state.readCounts[output] ?? 0) + 1
+            state.readCounts[output] = count
+            let display = state.outputs.first(where: { $0.index == output })?.displayName ?? ""
+            let name = PassPresenter.capturedTraceName(
+                output: output,
+                displayName: display,
+                readNumber: count
+            )
+            try? reader.captureTransferFunction(as: name)
+        }
         switch delaySuggestion(of: capture) {
         case .none:
             state.suggestionRaw = nil

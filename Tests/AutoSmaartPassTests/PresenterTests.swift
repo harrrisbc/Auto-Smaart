@@ -33,6 +33,8 @@ final class PresenterTests: XCTestCase {
         XCTAssertEqual(PassPresenter.readTrace, "Read")
         XCTAssertEqual(PassPresenter.stop, "Stop")
         XCTAssertEqual(PassPresenter.start, "Start")
+        XCTAssertEqual(PassPresenter.capturedTraceName(output: 3, displayName: "", readNumber: 2), "Matrix 3 2")
+        XCTAssertEqual(PassPresenter.capturedTraceName(output: 1, displayName: " Subs ", readNumber: 1), "Subs 1")
         XCTAssertEqual(PassPresenter.smaartConnectionLine(live: true), "Smaart connected")
         XCTAssertEqual(PassPresenter.smaartConnectionLine(live: false), "Smaart not connected")
         XCTAssertEqual(PassPresenter.storeTarget, "Store target")

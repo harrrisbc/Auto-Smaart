@@ -16,6 +16,8 @@ public enum RingOutNotice: Equatable {
     case noRTA
     case stopMuted
     case stopMuteIncomplete
+    case unmuted
+    case unmuteIncomplete
     case notchWriteFailedRestored
     case notchWriteFailedMismatch
     case faderWriteFailed
@@ -44,6 +46,8 @@ public struct RingOutState: Equatable {
     public var loopLocked: Bool = false
     public var undoAvailable: Bool = false
     public var successfulNotchWrites: Int = 0
+    /// True after Stop muted the selected fader strip; cleared by Unmute.
+    public var channelMuted: Bool = false
 }
 
 public final class RingOutController: ObservableObject {
@@ -258,15 +262,34 @@ public final class RingOutController: ObservableObject {
             do {
                 let address = try muteAddress(kind: state.faderKind, index: state.faderIndex)
                 try link.write(address: address, value: .int32(1))
+                state.channelMuted = true
                 state.notice = .stopMuted
             } catch {
                 state.notice = .stopMuteIncomplete
             }
         } else {
+            state.channelMuted = true
             state.notice = .stopMuted
         }
         state.undoAvailable = state.successfulNotchWrites > 0
         publishBands()
+    }
+
+    /// Unmutes only the strip the user selected. Does not restart the ring-out loop.
+    public func unmute() {
+        guard let link else {
+            state.channelMuted = false
+            state.notice = .unmuted
+            return
+        }
+        do {
+            let address = try muteAddress(kind: state.faderKind, index: state.faderIndex)
+            try link.write(address: address, value: .int32(0))
+            state.channelMuted = false
+            state.notice = .unmuted
+        } catch {
+            state.notice = .unmuteIncomplete
+        }
     }
 
     public func undoNotches() {

@@ -32,6 +32,11 @@ final class RingOutUIFakeRTA: SmaartReader {
         guard open else { throw SmaartReaderError.sessionClosed }
     }
 
+    func captureTransferFunction(as name: String) throws {
+        guard open else { throw SmaartReaderError.sessionClosed }
+        _ = name
+    }
+
     var isSessionOpen: Bool { open }
     func readTrace() throws -> SmaartCapture { throw SmaartReaderError.noTrace }
     func readTargetCurve() throws -> [MagnitudePoint] { throw SmaartReaderError.noTarget }

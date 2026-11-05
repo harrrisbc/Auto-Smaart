@@ -15,6 +15,11 @@ final class FakeRTA: SmaartReader {
         guard open else { throw SmaartReaderError.sessionClosed }
     }
 
+    func captureTransferFunction(as name: String) throws {
+        guard open else { throw SmaartReaderError.sessionClosed }
+        _ = name
+    }
+
     var isSessionOpen: Bool { open }
     func readTrace() throws -> SmaartCapture { throw SmaartReaderError.noTrace }
     func readTargetCurve() throws -> [MagnitudePoint] { throw SmaartReaderError.noTarget }
@@ -165,10 +170,17 @@ final class RingOutControllerTests: XCTestCase {
         XCTAssertEqual(muteWrites.count, 1)
         XCTAssertEqual(muteWrites.first?.1, try muteAddress(kind: .inputChannel, index: 1))
         XCTAssertEqual(muteWrites.first?.2, .int32(1))
+        XCTAssertTrue(controller.state.channelMuted)
         let writesAfter = link.log.filter { $0.0 == "write" }.count
         controller.tick(now: now.addingTimeInterval(1.0))
         XCTAssertEqual(link.log.filter { $0.0 == "write" }.count, writesAfter)
         XCTAssertGreaterThan(writesBefore, 0)
+        controller.unmute()
+        XCTAssertFalse(controller.state.channelMuted)
+        XCTAssertEqual(controller.state.notice, .unmuted)
+        let unmuteWrites = link.log.filter { $0.1.hasSuffix("/mute") && $0.2 == .int32(0) }
+        XCTAssertEqual(unmuteWrites.count, 1)
+        XCTAssertEqual(unmuteWrites.first?.1, try muteAddress(kind: .inputChannel, index: 1))
     }
 
     func testNoRTADoesNotRaise() throws {

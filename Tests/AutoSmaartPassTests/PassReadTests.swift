@@ -133,6 +133,35 @@ final class PassReadTests: XCTestCase {
         XCTAssertEqual(pass.state.notice, .writeFailedKept)
     }
 
+    func testReadCapturesTransferFunctionNamedByChannelAndCount() throws {
+        let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
+        let (pass, reader, _, _) = makePass(traces: [
+            capture(magnitude: [point], finder: 4),
+            capture(magnitude: [point], finder: 5),
+            capture(magnitude: [point], finder: 6)
+        ])
+        try prepare(pass, points: [point])
+        pass.setDisplayName("Subs", output: 1)
+        pass.readTrace()
+        XCTAssertEqual(reader.capturedTraceNames, ["Subs 1"])
+        XCTAssertEqual(pass.state.readCounts[1], 1)
+        pass.readTrace()
+        XCTAssertEqual(reader.capturedTraceNames, ["Subs 1", "Subs 2"])
+        XCTAssertEqual(pass.state.readCounts[1], 2)
+        pass.selectOutput(2)
+        pass.readTrace()
+        XCTAssertEqual(reader.capturedTraceNames, ["Subs 1", "Subs 2", "Matrix 2 1"])
+        XCTAssertEqual(pass.state.readCounts[2], 1)
+    }
+
+    func testReadCaptureUsesMatrixLabelWhenDisplayNameBlank() throws {
+        let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
+        let (pass, reader, _, _) = makePass(traces: [capture(magnitude: [point], finder: 4)])
+        try prepare(pass, points: [point])
+        pass.readTrace()
+        XCTAssertEqual(reader.capturedTraceNames, ["Matrix 1 1"])
+    }
+
     func testStopAndStartToggleSignalGeneratorWithoutClosingSession() throws {
         let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
         let (pass, reader, link, _) = makePass(traces: [capture(magnitude: [point], finder: 4)])

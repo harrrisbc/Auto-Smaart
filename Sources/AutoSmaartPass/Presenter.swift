@@ -31,6 +31,13 @@ public enum PassPresenter {
         live ? "Smaart connected" : "Smaart not connected"
     }
 
+    /// Smaart library name for a captured TF: selected Matrix channel + read count.
+    public static func capturedTraceName(output: Int, displayName: String, readNumber: Int) -> String {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = trimmed.isEmpty ? "Matrix \(output)" : trimmed
+        return "\(channel) \(readNumber)"
+    }
+
     public static func eqSupporting(bandCount: Int) -> String {
         if bandCount == 0 { return "No EQ is needed." }
         return "After delay write and remeasure. \(bandCount) of 8 bands used. Unused bands stay empty."

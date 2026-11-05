@@ -24,6 +24,15 @@ final class ScriptedReader: SmaartReader {
         guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
     }
 
+    private(set) var capturedTraceNames: [String] = []
+
+    func captureTransferFunction(as name: String) throws {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw SmaartReaderError.noTrace }
+        capturedTraceNames.append(trimmed)
+    }
+
     func readTrace() throws -> SmaartCapture {
         traceReads += 1
         guard !traces.isEmpty else { throw SmaartReaderError.noTrace }

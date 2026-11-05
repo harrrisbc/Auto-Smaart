@@ -77,6 +77,7 @@ public struct RingOutPage: View {
                 onLeave()
             }
             .disabled(controller.state.loopLocked)
+            QuietButton(title: RingOutPresenter.unmuteAction) { controller.unmute() }
             QuietButton(title: RingOutPresenter.stopAction) { controller.stop() }
         }
         .padding(.horizontal, ThemeMetrics.pagePadding)
