@@ -53,8 +53,7 @@ struct AutoSmaartApp: App {
             ShellView(
                 mode: $mode,
                 calibration: AppRuntime.controller,
-                ringOut: AppRuntime.ringOut,
-                muteLink: AppRuntime.liveLink
+                ringOut: AppRuntime.ringOut
             )
             .onAppear {
                 AppRuntime.controller.refreshSessionFlag()

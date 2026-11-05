@@ -5,7 +5,8 @@ import AutoSmaartCore
 final class PresenterTests: XCTestCase {
     func testErrorCopyMatchesSpec() {
         XCTAssertEqual(RingOutPresenter.noticeText(.noRTA), "No RTA")
-        XCTAssertEqual(RingOutPresenter.noticeText(.stopMuteIncomplete), "Stop: mute-all incomplete. Check the console.")
+        XCTAssertEqual(RingOutPresenter.noticeText(.stopMuteIncomplete), "Stop: channel mute failed. Check the console.")
+        XCTAssertEqual(RingOutPresenter.noticeText(.stopMuted), "Selected channel muted. Loop idle.")
         XCTAssertEqual(RingOutPresenter.noticeText(.notchWriteFailedRestored), "Notch write failed. Previous EQ restored.")
         XCTAssertEqual(RingOutPresenter.noticeText(.notchWriteFailedMismatch), "Notch write failed. Console EQ may not match the previous value.")
         XCTAssertEqual(RingOutPresenter.noticeText(.faderWriteFailed), "Fader write failed.")

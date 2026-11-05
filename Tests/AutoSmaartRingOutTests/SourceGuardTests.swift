@@ -14,7 +14,8 @@ final class SourceGuardTests: XCTestCase {
         for forbidden in ["CGWindowListCreateImage", "screencapture", "OpenAI", "ChatGPT", "model(", "random("] {
             XCTAssertFalse(source.contains(forbidden), forbidden)
         }
-        XCTAssertTrue(source.contains("muteAll"))
+        XCTAssertTrue(source.contains("muteAddress"))
+        XCTAssertFalse(source.contains("muteAll("))
         XCTAssertTrue(source.contains("SustainedPeakDetector"))
     }
 }

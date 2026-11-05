@@ -5,12 +5,10 @@ import AutoSmaartPass
 public struct CalibrationShell: View {
     @ObservedObject var controller: PassController
     var onRingOut: (() -> Void)?
-    var onStopMute: (() -> Void)?
 
-    public init(controller: PassController, onRingOut: (() -> Void)? = nil, onStopMute: (() -> Void)? = nil) {
+    public init(controller: PassController, onRingOut: (() -> Void)? = nil) {
         self.controller = controller
         self.onRingOut = onRingOut
-        self.onStopMute = onStopMute
     }
 
     public var body: some View {
@@ -45,10 +43,8 @@ public struct CalibrationShell: View {
                 QuietButton(title: "Ring Out", action: onRingOut)
             }
             QuietButton(title: PassPresenter.settings) { openSettings() }
-            QuietButton(title: PassPresenter.stop) {
-                controller.stop()
-                onStopMute?()
-            }
+            QuietButton(title: PassPresenter.start) { controller.startGenerator() }
+            QuietButton(title: PassPresenter.stop) { controller.stop() }
         }
         .padding(.horizontal, ThemeMetrics.pagePadding)
         .frame(height: ThemeMetrics.titleBar)

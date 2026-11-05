@@ -10,6 +10,7 @@ final class ScriptedReader: SmaartReader {
     var traces: [SmaartCapture]
     var target: [MagnitudePoint]?
     private(set) var traceReads = 0
+    private(set) var generatorActiveLog: [Bool] = []
 
     init(traces: [SmaartCapture], target: [MagnitudePoint]? = nil, open: Bool = true) {
         self.traces = traces
@@ -19,6 +20,11 @@ final class ScriptedReader: SmaartReader {
 
     func openSession() throws { isSessionOpen = true }
     func closeSession() { isSessionOpen = false }
+
+    func setSignalGeneratorActive(_ active: Bool) throws {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        generatorActiveLog.append(active)
+    }
 
     func readTrace() throws -> SmaartCapture {
         traceReads += 1

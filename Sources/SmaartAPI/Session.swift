@@ -20,6 +20,8 @@ public protocol SmaartReader: AnyObject {
     func readTargetCurve() throws -> [MagnitudePoint]
     func hasActiveRTA() throws -> Bool
     func readRTA() throws -> [MagnitudePoint]
+    /// Turns the Smaart signal generator output on or off. Does not stop TF/RTA engines.
+    func setSignalGeneratorActive(_ active: Bool) throws
 }
 
 public protocol SmaartWire: AnyObject {
@@ -221,6 +223,16 @@ public final class OfficialSmaartSession: SmaartReader {
         let magnitude = magnitudePoints(body["magnitude"] as? [[String: Any]] ?? [])
         if magnitude.isEmpty { throw SmaartReaderError.noRTA }
         return magnitude
+    }
+
+    public func setSignalGeneratorActive(_ active: Bool) throws {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        let reply = try request([
+            "action": "set",
+            "target": "signalGenerator",
+            "properties": [["active": active]]
+        ])
+        if reply["error"] != nil { throw SmaartReaderError.sessionClosed }
     }
 
     private func fetchActiveSpectrumName() throws -> String? {

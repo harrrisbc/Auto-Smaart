@@ -28,6 +28,10 @@ final class RingOutUIFakeRTA: SmaartReader {
     var preferredMeasurementName = ""
     func openSession() throws { open = true }
     func closeSession() { open = false }
+    func setSignalGeneratorActive(_ active: Bool) throws {
+        guard open else { throw SmaartReaderError.sessionClosed }
+    }
+
     var isSessionOpen: Bool { open }
     func readTrace() throws -> SmaartCapture { throw SmaartReaderError.noTrace }
     func readTargetCurve() throws -> [MagnitudePoint] { throw SmaartReaderError.noTarget }

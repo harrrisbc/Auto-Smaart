@@ -1,7 +1,6 @@
 import SwiftUI
 import AutoSmaartPass
 import AutoSmaartRingOut
-import ConsoleOSC
 
 public enum AppMode: Equatable {
     case calibration
@@ -12,18 +11,15 @@ public struct ShellView: View {
     @Binding var mode: AppMode
     var calibration: PassController?
     @ObservedObject var ringOut: RingOutController
-    var muteLink: OscLink?
 
     public init(
         mode: Binding<AppMode>,
         calibration: PassController?,
-        ringOut: RingOutController,
-        muteLink: OscLink? = nil
+        ringOut: RingOutController
     ) {
         self._mode = mode
         self.calibration = calibration
         self.ringOut = ringOut
-        self.muteLink = muteLink
     }
 
     public var body: some View {
@@ -36,8 +32,6 @@ public struct ShellView: View {
                         ringOut.updateHost(calibration.state.host)
                         ringOut.updatePort(calibration.state.port)
                         mode = .ringOut
-                    }, onStopMute: {
-                        if let muteLink { _ = muteAll(link: muteLink) }
                     })
                 } else {
                     Color.clear

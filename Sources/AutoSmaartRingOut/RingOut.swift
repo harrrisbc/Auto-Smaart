@@ -253,9 +253,15 @@ public final class RingOutController: ObservableObject {
         active = false
         state.loopLocked = false
         state.phase = .setup
+        // Mute only the strip the user selected for the raise — not every mic/output.
         if let link {
-            let result = muteAll(link: link)
-            state.notice = result.accepted == result.attempted ? .stopMuted : .stopMuteIncomplete
+            do {
+                let address = try muteAddress(kind: state.faderKind, index: state.faderIndex)
+                try link.write(address: address, value: .int32(1))
+                state.notice = .stopMuted
+            } catch {
+                state.notice = .stopMuteIncomplete
+            }
         } else {
             state.notice = .stopMuted
         }

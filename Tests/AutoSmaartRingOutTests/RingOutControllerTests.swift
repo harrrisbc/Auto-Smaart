@@ -11,6 +11,10 @@ final class FakeRTA: SmaartReader {
     var preferredMeasurementName = ""
     func openSession() throws { open = true }
     func closeSession() { open = false }
+    func setSignalGeneratorActive(_ active: Bool) throws {
+        guard open else { throw SmaartReaderError.sessionClosed }
+    }
+
     var isSessionOpen: Bool { open }
     func readTrace() throws -> SmaartCapture { throw SmaartReaderError.noTrace }
     func readTargetCurve() throws -> [MagnitudePoint] { throw SmaartReaderError.noTarget }
@@ -143,7 +147,7 @@ final class RingOutControllerTests: XCTestCase {
         XCTAssertEqual(controller.state.currentFader, .minusInfinity)
     }
 
-    func testStopMutesAllAndCancelsRaises() throws {
+    func testStopMutesSelectedChannelAndCancelsRaises() throws {
         let (controller, smaart, link) = try makeController()
         smaart.frames = Array(repeating: [
             MagnitudePoint(hz: 100, db: -40, phase: 0),
@@ -151,14 +155,16 @@ final class RingOutControllerTests: XCTestCase {
             MagnitudePoint(hz: 8000, db: -40, phase: 0)
         ], count: 100)
         controller.start()
-        var now = Date(timeIntervalSince1970: 0)
+        let now = Date(timeIntervalSince1970: 0)
         controller.tick(now: now.addingTimeInterval(0.2))
         let writesBefore = link.log.filter { $0.0 == "write" }.count
         controller.stop()
         XCTAssertEqual(controller.state.phase, .setup)
-        XCTAssertTrue(controller.state.notice == .stopMuted || controller.state.notice == .stopMuteIncomplete)
+        XCTAssertEqual(controller.state.notice, .stopMuted)
         let muteWrites = link.log.filter { $0.1.hasSuffix("/mute") }
-        XCTAssertEqual(muteWrites.count, 133)
+        XCTAssertEqual(muteWrites.count, 1)
+        XCTAssertEqual(muteWrites.first?.1, try muteAddress(kind: .inputChannel, index: 1))
+        XCTAssertEqual(muteWrites.first?.2, .int32(1))
         let writesAfter = link.log.filter { $0.0 == "write" }.count
         controller.tick(now: now.addingTimeInterval(1.0))
         XCTAssertEqual(link.log.filter { $0.0 == "write" }.count, writesAfter)

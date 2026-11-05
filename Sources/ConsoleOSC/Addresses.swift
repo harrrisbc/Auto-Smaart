@@ -21,6 +21,10 @@ public func faderAddress(kind: StripKind, index: Int) throws -> String {
     try stripPrefix(kind: kind, index: index) + "/fader"
 }
 
+public func muteAddress(kind: StripKind, index: Int) throws -> String {
+    try stripPrefix(kind: kind, index: index) + "/mute"
+}
+
 public func eqAddresses(kind: StripKind, index: Int, band: Int) throws -> (freq: String, gain: String, q: String, on: String) {
     guard (1...8).contains(band) else { throw AddressError.bandOutOfRange }
     let prefix = try stripPrefix(kind: kind, index: index) + "/EQ"

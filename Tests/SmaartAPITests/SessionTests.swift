@@ -176,4 +176,27 @@ final class SessionTests: XCTestCase {
             ])
         ]))
     }
+
+    func testSignalGeneratorActiveSetUsesOfficialTarget() throws {
+        let wire = ScriptedWire(replies: [
+            #"{"transferFunctionMeasurements":[]}"#,
+            #"{}"#,
+            #"{}"#
+        ])
+        let session = OfficialSmaartSession(wire: wire)
+        try session.openSession()
+        try session.setSignalGeneratorActive(false)
+        try session.setSignalGeneratorActive(true)
+        let sent = try wire.sent.map { try JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }
+        XCTAssertEqual(sent[1], JSONValue.object([
+            "action": .string("set"),
+            "target": .string("signalGenerator"),
+            "properties": .array([.object(["active": .bool(false)])])
+        ]))
+        XCTAssertEqual(sent[2], JSONValue.object([
+            "action": .string("set"),
+            "target": .string("signalGenerator"),
+            "properties": .array([.object(["active": .bool(true)])])
+        ]))
+    }
 }

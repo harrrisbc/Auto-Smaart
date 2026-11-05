@@ -20,6 +20,10 @@ final class ScriptedReader: SmaartReader {
     func openSession() throws { isSessionOpen = true }
     func closeSession() { isSessionOpen = false }
 
+    func setSignalGeneratorActive(_ active: Bool) throws {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+    }
+
     func readTrace() throws -> SmaartCapture {
         traceReads += 1
         guard !traces.isEmpty else { throw SmaartReaderError.noTrace }

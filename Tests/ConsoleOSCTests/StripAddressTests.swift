@@ -35,6 +35,11 @@ final class StripAddressTests: XCTestCase {
         XCTAssertEqual(addresses.last, "/sd/Master_Outputs/1/mute")
     }
 
+    func testMuteAddressFollowsStripKind() throws {
+        XCTAssertEqual(try muteAddress(kind: .inputChannel, index: 7), "/sd/Input_Channels/7/mute")
+        XCTAssertEqual(try muteAddress(kind: .matrixBus, index: 3), "/sd/Matrix_Outputs/3/mute")
+    }
+
     func testMuteAllWritesIntOneAndContinuesAfterFailure() throws {
         final class CountingLink: OscLink {
             var values: [String: OscValue] = [:]

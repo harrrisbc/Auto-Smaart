@@ -16,8 +16,8 @@ public enum RingOutPresenter {
         switch notice {
         case .none: return ""
         case .noRTA: return "No RTA"
-        case .stopMuted: return "System muted. Loop idle."
-        case .stopMuteIncomplete: return "Stop: mute-all incomplete. Check the console."
+        case .stopMuted: return "Selected channel muted. Loop idle."
+        case .stopMuteIncomplete: return "Stop: channel mute failed. Check the console."
         case .notchWriteFailedRestored: return "Notch write failed. Previous EQ restored."
         case .notchWriteFailedMismatch: return "Notch write failed. Console EQ may not match the previous value."
         case .faderWriteFailed: return "Fader write failed."
