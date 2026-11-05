@@ -10,9 +10,8 @@ public struct RingOutPage: View {
     var calibration: PassController?
     let onLeave: () -> Void
     @State private var settingsOpen = false
-
-    /// Short on-page strip choices — not the full console map.
-    private let shortCount = 8
+    @State private var faderIndexDraft = ""
+    @State private var eqIndexDraft = ""
 
     public init(
         controller: RingOutController,
@@ -45,6 +44,13 @@ public struct RingOutPage: View {
         .background(Theme.background)
         .foregroundStyle(Theme.text)
         .overlay { settingsOverlay }
+        .onAppear { syncIndexDrafts() }
+        .onChange(of: controller.state.faderKind) { _, _ in
+            faderIndexDraft = String(controller.state.faderIndex)
+        }
+        .onChange(of: controller.state.eqKind) { _, _ in
+            eqIndexDraft = String(controller.state.eqIndex)
+        }
         .onReceive(Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()) { date in
             controller.tick(now: date)
         }
@@ -134,11 +140,16 @@ public struct RingOutPage: View {
                 selected: controller.state.faderKind,
                 set: { controller.selectFader(kind: $0, index: clampedIndex($0, controller.state.faderIndex)) }
             )
-            indexList(
+            indexField(
                 kind: controller.state.faderKind,
-                selected: controller.state.faderIndex,
-                set: { controller.selectFader(kind: controller.state.faderKind, index: $0) }
+                draft: $faderIndexDraft,
+                commit: { controller.selectFader(kind: controller.state.faderKind, index: $0) }
             )
+            .onChange(of: faderIndexDraft) { _, newValue in
+                applyIndexDraft(kind: controller.state.faderKind, draft: newValue) {
+                    controller.selectFader(kind: controller.state.faderKind, index: $0)
+                }
+            }
 
             Text(RingOutPresenter.eqTargetHeading)
                 .font(.custom("Inter", size: 13).weight(.semibold))
@@ -148,11 +159,16 @@ public struct RingOutPage: View {
                 selected: controller.state.eqKind,
                 set: { controller.selectEQ(kind: $0, index: clampedIndex($0, controller.state.eqIndex)) }
             )
-            indexList(
+            indexField(
                 kind: controller.state.eqKind,
-                selected: controller.state.eqIndex,
-                set: { controller.selectEQ(kind: controller.state.eqKind, index: $0) }
+                draft: $eqIndexDraft,
+                commit: { controller.selectEQ(kind: controller.state.eqKind, index: $0) }
             )
+            .onChange(of: eqIndexDraft) { _, newValue in
+                applyIndexDraft(kind: controller.state.eqKind, draft: newValue) {
+                    controller.selectEQ(kind: controller.state.eqKind, index: $0)
+                }
+            }
 
             HStack(spacing: 12) {
                 QuietButton(title: RingOutPresenter.startAction) { controller.start() }
@@ -193,30 +209,40 @@ public struct RingOutPage: View {
         }
     }
 
-    private func indexList(kind: StripKind, selected: Int, set: @escaping (Int) -> Void) -> some View {
+    private func indexField(kind: StripKind, draft: Binding<String>, commit: @escaping (Int) -> Void) -> some View {
         let range = stripIndexRange(kind)
-        let indices = Array(range.prefix(shortCount))
-        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 10)], alignment: .leading, spacing: 10) {
-            ForEach(indices, id: \.self) { index in
-                Button {
-                    set(index)
-                } label: {
-                    Text(RingOutPresenter.stripLabel(kind: kind, index: index))
-                        .font(.custom("Inter", size: 15).weight(.medium))
-                        .foregroundStyle(selected == index ? Theme.text : Theme.secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(selected == index ? Theme.selectedRow : Theme.background)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected == index ? Theme.gold : Theme.stroke))
-                }
-                .buttonStyle(.plain)
-            }
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Number (\(range.lowerBound)–\(range.upperBound))")
+                .font(.custom("Inter", size: 11).weight(.medium))
+                .foregroundStyle(Theme.secondary)
+            TextField("\(range.lowerBound)", text: draft)
+                .textFieldStyle(.plain)
+                .font(.custom("Inter", size: 22).weight(.medium))
+                .monospacedDigit()
+                .padding(.horizontal, 14)
+                .frame(maxWidth: 200)
+                .frame(height: 52)
+                .background(Theme.raised)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.stroke))
+                .onSubmit { applyIndexDraft(kind: kind, draft: draft.wrappedValue, commit: commit) }
         }
+    }
+
+    private func applyIndexDraft(kind: StripKind, draft: String, commit: (Int) -> Void) {
+        let digits = draft.filter(\.isNumber)
+        guard let value = Int(digits), value > 0 else { return }
+        let clamped = clampedIndex(kind, value)
+        commit(clamped)
+    }
+
+    private func syncIndexDrafts() {
+        faderIndexDraft = String(controller.state.faderIndex)
+        eqIndexDraft = String(controller.state.eqIndex)
     }
 
     private func clampedIndex(_ kind: StripKind, _ index: Int) -> Int {
         let range = stripIndexRange(kind)
-        return min(max(index, range.lowerBound), min(range.upperBound, range.lowerBound + shortCount - 1))
+        return min(max(index, range.lowerBound), range.upperBound)
     }
 
     private func faderFraction(_ level: FaderLevel?) -> CGFloat {
