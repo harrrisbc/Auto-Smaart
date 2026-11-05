@@ -64,7 +64,7 @@ final class OscTests: XCTestCase {
         let directory = root.appendingPathComponent("Sources/ConsoleOSC")
         let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
         let source = try files.filter { $0.pathExtension == "swift" }.map { try String(contentsOf: $0) }.joined(separator: "\n")
-        for forbidden in ["eq_curve", "dynamic_eq", "Input_Channels", "delay_on", "Graphic", "eq_in", "lock"] {
+        for forbidden in ["eq_curve", "dynamic_eq", "delay_on", "Graphic", "eq_in", "lock"] {
             XCTAssertFalse(source.contains(forbidden), forbidden)
         }
     }

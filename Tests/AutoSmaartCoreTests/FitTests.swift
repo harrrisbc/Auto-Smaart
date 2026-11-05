@@ -95,7 +95,7 @@ final class FitTests: XCTestCase {
     func testSummedResponseMatchesTheBandAtItsCenter() {
         let band = EqBand(index: 1, hz: 100, gainDb: -6, q: 4)
         let curve = summedEqResponse(bands: [band], at: [100])
-        XCTAssertEqual(curve.first?.db, -6, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(curve.first).db, -6, accuracy: 1e-9)
         XCTAssertTrue(summedEqResponse(bands: [], samples: 32).isEmpty)
         XCTAssertEqual(summedEqResponse(bands: [band]).count, 128)
     }
