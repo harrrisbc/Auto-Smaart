@@ -261,24 +261,57 @@ struct RTAPlot: View {
     let points: [MagnitudePoint]
     let bands: [EqBand]
 
+    @State private var hoverBand: EqBand?
+    @State private var hoverPoint: CGPoint = .zero
+
     var body: some View {
+        let drawn = bands.filter { $0.hz >= 100 && $0.hz <= 8000 }
         VStack(alignment: .leading, spacing: 4) {
-            Canvas { context, size in
-                let kept = points.filter { $0.hz >= 100 && $0.hz <= 8000 }
-                var trace = Path()
-                for (offset, point) in kept.enumerated() {
-                    let spot = CGPoint(x: xPos(point.hz, width: size.width), y: yPos(point.db, height: size.height))
-                    if offset == 0 { trace.move(to: spot) } else { trace.addLine(to: spot) }
-                }
-                context.stroke(trace, with: .color(Theme.live), lineWidth: 1.5)
-                for band in bands where band.hz >= 100 && band.hz <= 8000 {
-                    var mark = Path()
-                    let x = xPos(band.hz, width: size.width)
-                    mark.move(to: CGPoint(x: x, y: 0))
-                    mark.addLine(to: CGPoint(x: x, y: size.height))
-                    context.stroke(mark, with: .color(Theme.gold), lineWidth: 2)
+            GeometryReader { geo in
+                ZStack(alignment: .topLeading) {
+                    Canvas { context, size in
+                        let kept = points.filter { $0.hz >= 100 && $0.hz <= 8000 }
+                        var trace = Path()
+                        for (offset, point) in kept.enumerated() {
+                            let spot = CGPoint(
+                                x: xPos(point.hz, width: size.width),
+                                y: yPos(point.db, height: size.height)
+                            )
+                            if offset == 0 { trace.move(to: spot) } else { trace.addLine(to: spot) }
+                        }
+                        context.stroke(trace, with: .color(Theme.live), lineWidth: 1.5)
+                        for band in drawn {
+                            let color = BandPalette.color(for: band.index)
+                            var mark = Path()
+                            let x = xPos(band.hz, width: size.width)
+                            mark.move(to: CGPoint(x: x, y: 0))
+                            mark.addLine(to: CGPoint(x: x, y: size.height))
+                            context.stroke(mark, with: .color(color), lineWidth: 2)
+                            let tip = CGRect(x: x - 3.5, y: 4, width: 7, height: 7)
+                            context.fill(Path(ellipseIn: tip), with: .color(color))
+                        }
+                    }
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            hoverPoint = location
+                            hoverBand = nearestBand(at: location, width: geo.size.width, bands: drawn)
+                        case .ended:
+                            hoverBand = nil
+                        }
+                    }
+
+                    if let hoverBand {
+                        BandHoverBadge(band: hoverBand)
+                            .position(
+                                x: min(geo.size.width - 90, max(90, hoverPoint.x)),
+                                y: max(18, hoverPoint.y - 22)
+                            )
+                            .allowsHitTesting(false)
+                    }
                 }
             }
+            .frame(minHeight: 160)
             .background(Theme.raised)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke))
             HStack {
@@ -289,6 +322,19 @@ struct RTAPlot: View {
             .font(.custom("Inter", size: 11))
             .foregroundStyle(Theme.dim)
         }
+    }
+
+    private func nearestBand(at location: CGPoint, width: CGFloat, bands: [EqBand]) -> EqBand? {
+        guard !bands.isEmpty, width > 0 else { return nil }
+        var best: (EqBand, CGFloat)?
+        for band in bands {
+            let distance = abs(location.x - xPos(band.hz, width: width))
+            if distance > 12 { continue }
+            if best == nil || distance < best!.1 {
+                best = (band, distance)
+            }
+        }
+        return best?.0
     }
 
     private func xPos(_ hz: Double, width: CGFloat) -> CGFloat {
