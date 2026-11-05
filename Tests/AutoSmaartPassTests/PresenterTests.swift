@@ -1,0 +1,155 @@
+import XCTest
+import AutoSmaartCore
+@testable import AutoSmaartPass
+
+final class PresenterTests: XCTestCase {
+    func testCopyMatchesTheSpec() {
+        XCTAssertEqual(PassPresenter.pickTitle, "Pick output")
+        XCTAssertEqual(PassPresenter.pickSupporting, "One Mix or Matrix bus. One curve. The console is not written on this step.")
+        XCTAssertEqual(PassPresenter.delayTitle, "Delay")
+        XCTAssertEqual(PassPresenter.delaySupporting, "Smaart delay suggestion. Not from the target or the reference.")
+        XCTAssertFalse(PassPresenter.delaySupporting.contains("Suggested from"))
+        XCTAssertEqual(PassPresenter.confirmWarning, "Nothing is sent until you confirm.")
+        XCTAssertEqual(PassPresenter.eqSupporting(bandCount: 0), "No EQ is needed.")
+        XCTAssertEqual(PassPresenter.eqSupporting(bandCount: 3), "After delay write and remeasure. 3 of 8 bands used. Unused bands stay empty.")
+        XCTAssertEqual(PassPresenter.noticeText(.noSmaartTrace), "No Smaart trace.")
+        XCTAssertEqual(PassPresenter.noticeText(.noDelaySuggestion), "No delay suggestion.")
+        XCTAssertEqual(PassPresenter.noticeText(.noSmaartTarget), "No Smaart target curve.")
+        XCTAssertEqual(PassPresenter.noticeText(.presetNoOverlap), "Preset does not overlap the trace.")
+        XCTAssertEqual(PassPresenter.noticeText(.couldNotRemeasure), "Could not remeasure.")
+        XCTAssertEqual(PassPresenter.noticeText(.writeFailedKept), "Write failed. Previous value kept.")
+        XCTAssertEqual(PassPresenter.noticeText(.writeFailedMismatch), "Write failed. Console may not match the previous value.")
+        XCTAssertEqual(PassPresenter.noticeText(.noEqNeeded), "No EQ is needed.")
+        XCTAssertEqual(PassPresenter.noticeText(.noEqWritten), "No EQ was written.")
+        XCTAssertNil(PassPresenter.noticeText(.none))
+        XCTAssertEqual(PassPresenter.previousDelayLine(snapshot: nil), "No previous value yet")
+        XCTAssertEqual(PassPresenter.eqUndoNote(hasSnapshot: false), "Previous bands are read on confirm.")
+        XCTAssertEqual(PassPresenter.eqUndoNote(hasSnapshot: true), "Last undo snapshot")
+        XCTAssertEqual(PassPresenter.lastWriteLabel(nil), "not written")
+        XCTAssertEqual(PassPresenter.lastWriteLabel("4.0 ms · no EQ"), "4.0 ms · no EQ")
+        XCTAssertEqual(PassPresenter.oscStatus(armed: true), "OSC armed")
+        XCTAssertEqual(PassPresenter.oscStatus(armed: false), "OSC idle")
+        XCTAssertEqual(PassPresenter.smaartLabel, "Smaart API")
+        XCTAssertEqual(PassPresenter.readTrace, "Read")
+        XCTAssertEqual(PassPresenter.stop, "Stop")
+        XCTAssertEqual(PassPresenter.start, "Start")
+        XCTAssertEqual(PassPresenter.mute, "Mute")
+        XCTAssertEqual(PassPresenter.unmute, "Unmute")
+        XCTAssertEqual(PassPresenter.noticeText(.matrixMuteIncomplete), "Mute failed. Check the console.")
+        XCTAssertEqual(PassPresenter.noticeText(.matrixUnmuteIncomplete), "Unmute failed. Check the console.")
+        XCTAssertEqual(PassPresenter.busLabel(kind: .matrix, index: 3), "Matrix 3")
+        XCTAssertEqual(PassPresenter.busLabel(kind: .mix, index: 5), "Mix 5")
+        XCTAssertEqual(PassPresenter.smaartConnectionLine(live: true), "Smaart connected")
+        XCTAssertEqual(PassPresenter.smaartConnectionLine(live: false), "Smaart not connected")
+        XCTAssertEqual(PassPresenter.storeTarget, "Store target")
+        XCTAssertEqual(PassPresenter.storeTrace, "Store trace")
+        XCTAssertEqual(PassPresenter.recall, "Recall")
+        XCTAssertEqual(PassPresenter.confirmDelay, "Confirm delay write")
+        XCTAssertEqual(PassPresenter.confirmEq, "Confirm EQ write")
+        XCTAssertEqual(PassPresenter.back, "Back")
+        XCTAssertEqual(PassPresenter.undoDelay, "Undo delay")
+        XCTAssertEqual(PassPresenter.undoLastWrite, "Undo last write")
+        XCTAssertEqual(PassPresenter.retryRemeasure, "Retry remeasure")
+        XCTAssertEqual(PassPresenter.frequencyCell(nil), "—")
+        XCTAssertEqual(PassPresenter.gainCell(nil), "—")
+        XCTAssertEqual(PassPresenter.qCell(nil), "—")
+        let band = EqBand(index: 1, hz: 3150, gainDb: -1.5, q: 4)
+        XCTAssertEqual(PassPresenter.frequencyCell(band), "3.15 kHz")
+        XCTAssertEqual(PassPresenter.gainCell(band), "−1.5 dB")
+        XCTAssertEqual(PassPresenter.qCell(band), "4.00")
+        XCTAssertEqual(PassPresenter.suggestedDelay(12.4), "12.4 ms")
+        XCTAssertNotEqual(PassPresenter.suggestedDelay(12.4), "18.6 ms")
+    }
+
+    func testOscArmedOnlyWhenThatConfirmCanSend() {
+        var state = PassState()
+        state.host = "10.0.0.8"
+        state.port = "8000"
+        state.step = .pick
+        XCTAssertFalse(PassPresenter.oscArmed(state))
+        state.step = .delay
+        state.displayedDelayMs = 12.4
+        XCTAssertTrue(PassPresenter.oscArmed(state))
+        state.step = .eq
+        state.bands = []
+        XCTAssertFalse(PassPresenter.oscArmed(state))
+        state.bands = [EqBand(index: 1, hz: 100, gainDb: -6, q: 4)]
+        XCTAssertTrue(PassPresenter.oscArmed(state))
+        state.step = .compare
+        XCTAssertFalse(PassPresenter.oscArmed(state))
+        state.step = .delay
+        state.host = ""
+        XCTAssertFalse(PassPresenter.oscArmed(state))
+    }
+
+    func testReadAndStoreEnablement() {
+        var state = PassState()
+        XCTAssertFalse(PassPresenter.readEnabled(state))
+        XCTAssertFalse(PassPresenter.storeEnabled(state))
+        state.selectedOutput = 1
+        XCTAssertFalse(PassPresenter.readEnabled(state))
+        state.smaartLive = true
+        XCTAssertTrue(PassPresenter.readEnabled(state))
+        state.host = "10.0.0.8"
+        state.port = "8000"
+        state.passPresetName = "Main"
+        state.draftName = "Main"
+        XCTAssertTrue(PassPresenter.storeEnabled(state))
+        state.draftName = " "
+        XCTAssertFalse(PassPresenter.storeEnabled(state))
+        state.step = .eq
+        state.bands = []
+        XCTAssertTrue(PassPresenter.confirmEqEnabled(state))
+        state.bands = nil
+        XCTAssertFalse(PassPresenter.confirmEqEnabled(state))
+    }
+
+    func testCompareReadout() {
+        var state = PassState()
+        state.selectedOutput = 1
+        state.outputs = [MatrixOutputRecord(index: 1, displayName: "", lastWrite: nil, delaySnapshot: DelaySnapshot(delay: .float32(0), fineDelay: .float32(0)), eqSnapshot: nil)]
+        state.displayedDelayMs = 4
+        state.bands = []
+        state.notice = .noEqWritten
+        XCTAssertEqual(PassPresenter.compareLines(state), [
+            "Delay 0.0 ms → 4.0 ms",
+            "Bands written: 0. Bands left empty: 8.",
+            "No EQ was written."
+        ])
+        state.eqRemeasureFailed = true
+        state.bands = [EqBand(index: 1, hz: 100, gainDb: -6, q: 4)]
+        XCTAssertTrue(PassPresenter.compareLines(state).contains("Could not remeasure."))
+        XCTAssertTrue(PassPresenter.compareLines(state).contains("Bands written: 1. Bands left empty: 7."))
+    }
+
+    func testGraphUsesPreviewUntilTheWriteBandsExist() {
+        var state = PassState()
+        let preview = EqBand(index: 1, hz: 100, gainDb: -6, q: 4)
+        state.previewBands = [preview]
+        XCTAssertEqual(PassPresenter.graphBands(state), [preview])
+        XCTAssertEqual(PassPresenter.previewBandLine(count: 0), "No EQ is needed.")
+        XCTAssertEqual(PassPresenter.previewBandLine(count: 3), "3 of 8 bands. Unused bands stay empty.")
+        state.bands = []
+        XCTAssertTrue(PassPresenter.graphBands(state).isEmpty)
+        state.bands = nil
+        state.notice = .presetNoOverlap
+        XCTAssertTrue(PassPresenter.graphBands(state).isEmpty)
+        state.notice = .none
+        state.latestMagnitude = [MagnitudePoint(hz: 80, db: 1, phase: 0)]
+        state.postDelayMagnitude = [MagnitudePoint(hz: 100, db: 2, phase: 0)]
+        XCTAssertEqual(PassPresenter.magnitudeTrace(state).first?.hz, 100)
+    }
+
+    func testUndoControlsFollowTheSnapshot() {
+        var state = PassState()
+        state.selectedOutput = 1
+        state.outputs = [MatrixOutputRecord(index: 1, displayName: "", lastWrite: nil, delaySnapshot: nil, eqSnapshot: nil)]
+        XCTAssertFalse(PassPresenter.showsUndoDelay(state))
+        XCTAssertFalse(PassPresenter.showsUndoLastWrite(state))
+        state.outputs[0].delaySnapshot = DelaySnapshot(delay: .float32(1), fineDelay: .float32(1))
+        XCTAssertTrue(PassPresenter.showsUndoDelay(state))
+        state.step = .compare
+        state.compareOpen = true
+        XCTAssertTrue(PassPresenter.showsUndoLastWrite(state))
+    }
+}
