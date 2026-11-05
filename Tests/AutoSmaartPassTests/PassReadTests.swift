@@ -113,6 +113,26 @@ final class PassReadTests: XCTestCase {
         XCTAssertTrue(link.log.isEmpty)
     }
 
+    func testReadPreviewsBandsWithoutWriting() throws {
+        let loud = MagnitudePoint(hz: 100, db: 6, phase: 0)
+        let flat = [MagnitudePoint(hz: 20, db: 0, phase: 0), MagnitudePoint(hz: 20000, db: 0, phase: 0)]
+        let (pass, _, link, _) = makePass(traces: [capture(magnitude: [loud], finder: 4)])
+        try prepare(pass, points: flat)
+        pass.setHost("")
+        pass.readTrace()
+        XCTAssertEqual(pass.state.step, .delay)
+        XCTAssertNil(pass.state.bands)
+        XCTAssertFalse(pass.canOpen(.eq))
+        XCTAssertFalse(pass.state.previewBands?.isEmpty ?? true)
+        XCTAssertEqual(PassPresenter.graphBands(pass.state), pass.state.previewBands ?? [])
+        XCTAssertTrue(link.log.isEmpty)
+        pass.confirmDelay()
+        pass.confirmEq()
+        XCTAssertTrue(link.log.isEmpty)
+        XCTAssertFalse(pass.state.delayWrittenThisPass)
+        XCTAssertEqual(pass.state.notice, .writeFailedKept)
+    }
+
     func testNoTargetCurveNotice() {
         let (pass, _, _, _) = makePass(traces: [])
         pass.setDraftName("Missing")

@@ -34,6 +34,8 @@ public struct PassState: Equatable {
     public var suggestionRaw: Double?
     public var displayedDelayMs: Double?
     public var postDelayMagnitude: [MagnitudePoint]?
+    /// Display fit from the last Read and the selected preset. Not the write path.
+    public var previewBands: [EqBand]?
     public var bands: [EqBand]?
     public var beforeCurve: [MagnitudePoint]?
     public var afterCurve: [MagnitudePoint]?
@@ -57,6 +59,9 @@ public final class PassController: ObservableObject {
     private let bank: CurveBank
     fileprivate let outputs: OutputStore
     public weak var endpoint: ConsoleEndpoint?
+    @Published public var matrixPickerOpen = false
+    @Published public var presetPickerOpen = false
+    @Published public var settingsOpen = false
 
     public init(reader: SmaartReader, link: OscLink, bank: CurveBank, outputs: OutputStore) {
         self.reader = reader
@@ -189,6 +194,7 @@ public final class PassController: ObservableObject {
             state.notice = .none
             state.step = .delay
         }
+        updatePreview(from: capture.magnitude)
     }
 
     public func back() {
@@ -214,6 +220,22 @@ public final class PassController: ObservableObject {
         state.step = .pick
         state.suggestionRaw = nil
         state.displayedDelayMs = nil
+        state.previewBands = nil
+    }
+
+    /// Bands for the graph only. `bands` stays empty until delay confirm and remeasure.
+    private func updatePreview(from magnitude: [MagnitudePoint]) {
+        guard let name = state.passPresetName,
+              let preset = state.presets.first(where: { $0.name == name }) else {
+            state.previewBands = nil
+            return
+        }
+        switch fitEq(measurement: magnitude, preset: preset.points) {
+        case .noOverlap:
+            state.previewBands = nil
+        case .bands(let bands):
+            state.previewBands = bands
+        }
     }
 
     private func clearPassProgress() {
@@ -221,6 +243,7 @@ public final class PassController: ObservableObject {
         state.displayedDelayMs = nil
         state.latestMagnitude = nil
         state.postDelayMagnitude = nil
+        state.previewBands = nil
         state.bands = nil
         state.beforeCurve = nil
         state.afterCurve = nil

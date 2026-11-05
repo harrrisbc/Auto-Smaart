@@ -115,6 +115,24 @@ final class PresenterTests: XCTestCase {
         XCTAssertTrue(PassPresenter.compareLines(state).contains("Bands written: 1. Bands left empty: 7."))
     }
 
+    func testGraphUsesPreviewUntilTheWriteBandsExist() {
+        var state = PassState()
+        let preview = EqBand(index: 1, hz: 100, gainDb: -6, q: 4)
+        state.previewBands = [preview]
+        XCTAssertEqual(PassPresenter.graphBands(state), [preview])
+        XCTAssertEqual(PassPresenter.previewBandLine(count: 0), "No EQ is needed.")
+        XCTAssertEqual(PassPresenter.previewBandLine(count: 3), "3 of 8 bands. Unused bands stay empty.")
+        state.bands = []
+        XCTAssertTrue(PassPresenter.graphBands(state).isEmpty)
+        state.bands = nil
+        state.notice = .presetNoOverlap
+        XCTAssertTrue(PassPresenter.graphBands(state).isEmpty)
+        state.notice = .none
+        state.latestMagnitude = [MagnitudePoint(hz: 80, db: 1, phase: 0)]
+        state.postDelayMagnitude = [MagnitudePoint(hz: 100, db: 2, phase: 0)]
+        XCTAssertEqual(PassPresenter.magnitudeTrace(state).first?.hz, 100)
+    }
+
     func testUndoControlsFollowTheSnapshot() {
         var state = PassState()
         state.selectedOutput = 1

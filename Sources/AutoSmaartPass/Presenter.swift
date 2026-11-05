@@ -35,6 +35,23 @@ public enum PassPresenter {
         return "After delay write and remeasure. \(bandCount) of 8 bands used. Unused bands stay empty."
     }
 
+    /// Copy for the Read preview. The write still waits for delay confirm and remeasure.
+    public static func previewBandLine(count: Int) -> String {
+        if count == 0 { return "No EQ is needed." }
+        return "\(count) of 8 bands. Unused bands stay empty."
+    }
+
+    /// Official bands after remeasure, otherwise the Read preview.
+    public static func graphBands(_ state: PassState) -> [EqBand] {
+        if state.notice == .presetNoOverlap { return [] }
+        if let bands = state.bands { return bands }
+        return state.previewBands ?? []
+    }
+
+    public static func magnitudeTrace(_ state: PassState) -> [MagnitudePoint] {
+        state.postDelayMagnitude ?? state.latestMagnitude ?? []
+    }
+
     public static func noticeText(_ notice: PassNotice) -> String? {
         switch notice {
         case .none: return nil

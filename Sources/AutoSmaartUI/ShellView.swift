@@ -1,4 +1,5 @@
 import SwiftUI
+import AutoSmaartCore
 import AutoSmaartPass
 
 public struct ShellView: View {
@@ -11,135 +12,282 @@ public struct ShellView: View {
     public var body: some View {
         VStack(spacing: 0) {
             titleBar
-            HStack(spacing: 0) {
-                if showsWorkflowRail {
-                    rail
-                }
-                screen
-            }
-            bottomBar
+            selectors
+            suggestion
+            graph
         }
         .frame(width: ThemeMetrics.windowWidth, height: ThemeMetrics.windowHeight)
         .background(Theme.background)
         .foregroundStyle(Theme.text)
+        .overlay { popupLayer }
         .onAppear {
             Theme.registerFonts()
             controller.refreshSessionFlag()
         }
     }
 
-    /// Delay / EQ / Compare stay available after Read — not on the landing page.
-    private var showsWorkflowRail: Bool {
-        switch controller.state.step {
-        case .delay, .eq, .compare: return true
-        case .pick, .settings: return false
-        }
-    }
-
     private var titleBar: some View {
-        HStack {
-            Text("Auto-Smaart")
-                .font(.custom("Playfair Display", size: 18).italic())
-                .padding(.leading, showsWorkflowRail ? 78 : ThemeMetrics.pagePadding)
-            if showsWorkflowRail {
-                Text("Quantum 225")
-                    .font(.custom("Inter", size: 13))
-                    .foregroundStyle(Theme.secondary)
-            }
-            Spacer()
+        HStack(spacing: 16) {
             HStack(spacing: 8) {
-                Circle().fill(controller.state.smaartLive ? Theme.live : Theme.dim).frame(width: 8, height: 8)
+                Circle()
+                    .fill(controller.state.smaartLive ? Theme.live : Theme.dim)
+                    .frame(width: 8, height: 8)
                 Text(PassPresenter.smaartConnectionLine(live: controller.state.smaartLive))
                     .font(.custom("Inter", size: 13))
                     .foregroundStyle(Theme.secondary)
-                if controller.state.step == .pick || controller.state.step == .settings {
-                    QuietButton(title: PassPresenter.settings) { controller.openRail(.settings) }
-                }
             }
-            .padding(.trailing, ThemeMetrics.pagePadding)
+            Spacer()
+            QuietButton(title: PassPresenter.settings) { openSettings() }
+            QuietButton(title: PassPresenter.stop) { controller.stop() }
         }
+        .padding(.horizontal, ThemeMetrics.pagePadding)
         .frame(height: ThemeMetrics.titleBar)
     }
 
-    private var rail: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            railRow(.pick, title: "Pick", done: controller.canOpen(.delay))
-            railRow(.delay, title: "Delay", done: controller.state.delayWrittenThisPass)
-            railRow(.eq, title: "EQ", done: controller.state.compareOpen)
-            railRow(.compare, title: "Compare", done: false)
-            Spacer()
-        }
-        .frame(width: ThemeMetrics.rail)
-        .background(Theme.raised)
-    }
-
-    private func railRow(_ step: PassStep, title: String, done: Bool) -> some View {
-        Button { controller.openRail(step) } label: {
-            HStack {
-                Rectangle().fill(controller.state.step == step ? Theme.gold : Color.clear).frame(width: 2)
-                Text(title)
-                    .font(.custom("Inter", size: 13).weight(.medium))
-                    .foregroundStyle(controller.state.step == step ? Theme.lightGold : Theme.dim)
-                Spacer()
-                if done { Image(systemName: "checkmark").foregroundStyle(Theme.gold).font(.system(size: 11)) }
-            }
-            .frame(height: ThemeMetrics.row)
-        }
-        .buttonStyle(.plain)
-        .disabled(!controller.canOpen(step))
-    }
-
-    @ViewBuilder private var screen: some View {
-        switch controller.state.step {
-        case .pick: PickView(controller: controller)
-        case .settings: SettingsView(controller: controller)
-        case .delay: DelayView(controller: controller)
-        case .eq: EQView(controller: controller)
-        case .compare: CompareView(controller: controller)
-        }
-    }
-
-    private var bottomBar: some View {
-        HStack {
-            Text(PassPresenter.selectionSummary(controller.state))
-                .font(.custom("Inter", size: 13))
-                .foregroundStyle(Theme.secondary)
-            Spacer()
-            if let notice = PassPresenter.noticeText(controller.state.notice) {
-                Text(notice).font(.custom("Inter", size: 13)).foregroundStyle(Theme.secondary)
-            }
-            bottomAction
+    private var selectors: some View {
+        HStack(alignment: .top, spacing: ThemeMetrics.groupGap) {
+            selector(kicker: "Matrix", title: matrixTitle) { openMatrix() }
+            selector(kicker: "EQ", title: presetTitle) { openPreset() }
         }
         .padding(.horizontal, ThemeMetrics.pagePadding)
-        .frame(height: ThemeMetrics.bottomBar)
+        .padding(.top, 4)
     }
 
-    @ViewBuilder private var bottomAction: some View {
-        switch controller.state.step {
-        case .pick:
-            HStack(spacing: 16) {
-                QuietButton(title: PassPresenter.stop) { controller.stop() }
-                PrimaryButton(title: PassPresenter.readTrace) { controller.readTrace() }
-                    .disabled(!PassPresenter.readEnabled(controller.state))
-            }
-        case .settings:
-            QuietButton(title: PassPresenter.back) { controller.back() }
-        case .delay:
-            HStack(spacing: 16) {
-                QuietButton(title: PassPresenter.back) { controller.back() }
+    private var suggestion: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(delayHeadline)
+                        .font(.custom("Inter", size: 22).weight(.medium))
+                        .monospacedDigit()
+                    Text(PassPresenter.delaySupporting)
+                        .font(.custom("Inter", size: 13))
+                        .foregroundStyle(Theme.secondary)
+                    Text(previousDelay)
+                        .font(.custom("Inter", size: 13))
+                        .foregroundStyle(Theme.secondary)
+                }
+                Spacer(minLength: 12)
+                if PassPresenter.showsUndoDelay(controller.state) {
+                    QuietButton(title: PassPresenter.undoDelay) { controller.undoDelay() }
+                }
                 if controller.state.notice == .couldNotRemeasure {
                     QuietButton(title: PassPresenter.retryRemeasure) { controller.retryRemeasure() }
                 }
-                PrimaryButton(title: PassPresenter.confirmDelay) { controller.confirmDelay() }
-                    .disabled(!PassPresenter.confirmDelayEnabled(controller.state))
+                actionButton(PassPresenter.readTrace, enabled: PassPresenter.readEnabled(controller.state)) {
+                    controller.readTrace()
+                }
+                actionButton(PassPresenter.confirmDelay, enabled: PassPresenter.confirmDelayEnabled(controller.state)) {
+                    controller.confirmDelay()
+                }
             }
-        case .eq:
-            PrimaryButton(title: PassPresenter.confirmEq) { controller.confirmEq() }
-                .disabled(!PassPresenter.confirmEqEnabled(controller.state))
-        case .compare:
-            if PassPresenter.showsUndoLastWrite(controller.state) {
-                QuietButton(title: PassPresenter.undoLastWrite) { controller.undoLastWrite() }
+            HStack(spacing: 16) {
+                Text(eqLine)
+                    .font(.custom("Inter", size: 13))
+                    .foregroundStyle(Theme.secondary)
+                Spacer(minLength: 12)
+                if PassPresenter.showsUndoLastWrite(controller.state) {
+                    QuietButton(title: PassPresenter.undoLastWrite) { controller.undoLastWrite() }
+                }
+                actionButton(PassPresenter.confirmEq, enabled: PassPresenter.confirmEqEnabled(controller.state)) {
+                    controller.confirmEq()
+                }
+            }
+            Text(PassPresenter.confirmWarning)
+                .font(.custom("Inter", size: 13))
+                .foregroundStyle(Theme.secondary)
+            if let notice = PassPresenter.noticeText(controller.state.notice) {
+                Text(notice)
+                    .font(.custom("Inter", size: 13))
+                    .foregroundStyle(Theme.secondary)
             }
         }
+        .padding(.horizontal, ThemeMetrics.pagePadding)
+        .padding(.top, ThemeMetrics.groupGap)
+    }
+
+    private var graph: some View {
+        let trace = PassPresenter.magnitudeTrace(controller.state)
+        let bands = PassPresenter.graphBands(controller.state)
+        return MagnitudePlot(
+            before: trace,
+            after: controller.state.afterCurve,
+            eq: summedEqResponse(bands: bands)
+        )
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.raised)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke))
+        .padding(ThemeMetrics.pagePadding)
+    }
+
+    @ViewBuilder private var popupLayer: some View {
+        if controller.matrixPickerOpen {
+            ZStack(alignment: .topLeading) {
+                scrim { controller.matrixPickerOpen = false }
+                matrixPopover
+                    .padding(.top, 132)
+                    .padding(.leading, ThemeMetrics.pagePadding)
+            }
+        } else if controller.presetPickerOpen {
+            ZStack(alignment: .topTrailing) {
+                scrim { controller.presetPickerOpen = false }
+                presetPopover
+                    .padding(.top, 132)
+                    .padding(.trailing, ThemeMetrics.pagePadding)
+            }
+        } else if controller.settingsOpen {
+            ZStack {
+                scrim { controller.settingsOpen = false }
+                settingsPanel
+            }
+        }
+    }
+
+    private func scrim(_ close: @escaping () -> Void) -> some View {
+        Color.black.opacity(0.45)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: close)
+    }
+
+    private var matrixTitle: String {
+        if let index = controller.state.selectedOutput { return "Matrix \(index)" }
+        return "Matrix"
+    }
+
+    private var presetTitle: String {
+        controller.state.passPresetName ?? "EQ preset"
+    }
+
+    private var delayHeadline: String {
+        if let shown = controller.state.displayedDelayMs { return PassPresenter.suggestedDelay(shown) }
+        return PassPresenter.emDash
+    }
+
+    private var previousDelay: String {
+        let snapshot = controller.state.selectedOutput.flatMap { index in
+            controller.state.outputs.indices.contains(index - 1) ? controller.state.outputs[index - 1].delaySnapshot : nil
+        }
+        return PassPresenter.previousDelayLine(snapshot: snapshot)
+    }
+
+    private var eqLine: String {
+        if let bands = controller.state.bands { return PassPresenter.eqSupporting(bandCount: bands.count) }
+        if let preview = controller.state.previewBands { return PassPresenter.previewBandLine(count: preview.count) }
+        return ""
+    }
+
+    private var matrixPopover: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(1...12, id: \.self) { index in
+                Button {
+                    controller.selectOutput(index)
+                    controller.matrixPickerOpen = false
+                } label: {
+                    HStack {
+                        Text("Matrix \(index)")
+                        Spacer()
+                        if controller.state.selectedOutput == index {
+                            Image(systemName: "checkmark").foregroundStyle(Theme.gold).font(.system(size: 11))
+                        }
+                    }
+                    .font(.custom("Inter", size: 13))
+                    .foregroundStyle(Theme.text)
+                    .frame(height: ThemeMetrics.row)
+                    .padding(.horizontal, 12)
+                    .background(controller.state.selectedOutput == index ? Theme.selectedRow : Color.clear)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 8)
+        .frame(width: 240)
+        .background(Theme.background)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.stroke))
+    }
+
+    private var presetPopover: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(controller.state.presets, id: \.name) { preset in
+                    Button {
+                        controller.recall(name: preset.name)
+                        controller.presetPickerOpen = false
+                    } label: {
+                        CurveThumb(
+                            points: preset.points,
+                            selected: controller.state.passPresetName == preset.name,
+                            label: preset.name
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(12)
+        }
+        .frame(width: 300, height: 380)
+        .background(Theme.background)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.stroke))
+    }
+
+    private var settingsPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsView(controller: controller)
+            QuietButton(title: PassPresenter.back) { controller.settingsOpen = false }
+                .padding(.horizontal, ThemeMetrics.pagePadding)
+                .padding(.bottom, ThemeMetrics.pagePadding)
+        }
+        .frame(width: 440, height: 560)
+        .background(Theme.background)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke))
+    }
+
+    private func selector(kicker: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(kicker)
+                        .font(.custom("Inter", size: 11).weight(.medium))
+                        .tracking(0.88)
+                        .foregroundStyle(Theme.lightGold)
+                    Text(title)
+                        .font(.custom("Inter", size: 16).weight(.medium))
+                        .foregroundStyle(Theme.text)
+                }
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.secondary)
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .background(Theme.raised)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.stroke))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func actionButton(_ title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        PrimaryButton(title: title, action: action)
+            .disabled(!enabled)
+            .opacity(enabled ? 1 : 0.4)
+    }
+
+    private func openMatrix() {
+        controller.presetPickerOpen = false
+        controller.settingsOpen = false
+        controller.matrixPickerOpen = true
+    }
+
+    private func openPreset() {
+        controller.matrixPickerOpen = false
+        controller.settingsOpen = false
+        controller.presetPickerOpen = true
+    }
+
+    private func openSettings() {
+        controller.matrixPickerOpen = false
+        controller.presetPickerOpen = false
+        controller.settingsOpen = true
     }
 }

@@ -88,6 +88,25 @@ final class PassEqTests: XCTestCase {
         XCTAssertEqual(pass.state.outputs[0].lastWrite, "4.0 ms · 8 bands")
     }
 
+    func testEmptyHostDoesNotSendEq() throws {
+        let loud = MagnitudePoint(hz: 100, db: 6, phase: 0)
+        let flat = [MagnitudePoint(hz: 20, db: 0, phase: 0), MagnitudePoint(hz: 20000, db: 0, phase: 0)]
+        let (pass, _, link, _) = makePass(traces: [
+            capture(magnitude: [loud], finder: 4),
+            capture(magnitude: [loud], finder: 4)
+        ])
+        try prepare(pass, points: flat)
+        pass.readTrace()
+        pass.confirmDelay()
+        let writes = link.log.filter { $0.op == "write" }.count
+        pass.setHost("")
+        pass.confirmEq()
+        XCTAssertEqual(link.log.filter { $0.op == "write" }.count, writes)
+        XCTAssertEqual(pass.state.step, .eq)
+        XCTAssertEqual(pass.state.notice, .writeFailedKept)
+        XCTAssertNil(pass.state.outputs[0].eqSnapshot)
+    }
+
     func testFailedEqWriteKeepsThePreviousSnapshot() throws {
         let loud = MagnitudePoint(hz: 100, db: 6, phase: 0)
         let flat = [MagnitudePoint(hz: 100, db: 0, phase: 0), MagnitudePoint(hz: 10000, db: 0, phase: 0)]

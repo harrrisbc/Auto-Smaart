@@ -37,6 +37,8 @@ public enum Theme {
     static let stroke = Color.white.opacity(0.1)
     static let beforeTrace = Color(hex: 0xa78b71).opacity(0.7)
     static let afterTrace = Color(hex: 0xe8d5b7)
+    static let eqHex = "5eead4"
+    static let eqTrace = Color(hex: 0x5eead4)
 
     static func registerFonts() {
         // Do not touch Bundle.module — SPM's accessor fatalErrors when the resource

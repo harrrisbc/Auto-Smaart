@@ -38,6 +38,27 @@ func peakingMagnitudeDb(binHz: Double, centerHz: Double, gainDb: Double, q: Doub
     return 20.0 * log10(numerator / denominator)
 }
 
+public func summedEqResponse(bands: [EqBand], at frequencies: [Double]) -> [MagnitudePoint] {
+    guard !bands.isEmpty else { return [] }
+    return frequencies.map { hz in
+        let db = bands.reduce(0.0) { partial, band in
+            partial + peakingMagnitudeDb(binHz: hz, centerHz: band.hz, gainDb: band.gainDb, q: band.q)
+        }
+        return MagnitudePoint(hz: hz, db: db, phase: 0)
+    }
+}
+
+public func summedEqResponse(bands: [EqBand], samples: Int = 128) -> [MagnitudePoint] {
+    guard !bands.isEmpty, samples > 1 else { return [] }
+    let logStart = log10(20.0)
+    let logEnd = log10(20000.0)
+    let frequencies = (0..<samples).map { index -> Double in
+        let t = Double(index) / Double(samples - 1)
+        return pow(10, logStart + (logEnd - logStart) * t)
+    }
+    return summedEqResponse(bands: bands, at: frequencies)
+}
+
 public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> FitResult {
     let bins = measurement.filter { $0.hz >= 20 && $0.hz <= 20000 }.sorted { $0.hz < $1.hz }
     let presetPoints = uniquePreset(preset)

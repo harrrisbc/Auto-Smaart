@@ -92,6 +92,14 @@ final class FitTests: XCTestCase {
         XCTAssertEqual(fitEq(measurement: measurement, preset: preset), .bands([]))
     }
 
+    func testSummedResponseMatchesTheBandAtItsCenter() {
+        let band = EqBand(index: 1, hz: 100, gainDb: -6, q: 4)
+        let curve = summedEqResponse(bands: [band], at: [100])
+        XCTAssertEqual(curve.first?.db, -6, accuracy: 1e-9)
+        XCTAssertTrue(summedEqResponse(bands: [], samples: 32).isEmpty)
+        XCTAssertEqual(summedEqResponse(bands: [band]).count, 128)
+    }
+
     func testPeakingCenterUsesThe48kModel() {
         XCTAssertEqual(peakingMagnitudeDb(binHz: 100, centerHz: 100, gainDb: 6, q: 4), 6, accuracy: 1e-9)
         XCTAssertEqual(peakingMagnitudeDb(binHz: 200, centerHz: 100, gainDb: 6, q: 4), 0.1742005174966169, accuracy: 1e-9)

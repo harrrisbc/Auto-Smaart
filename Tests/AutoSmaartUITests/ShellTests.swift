@@ -42,8 +42,18 @@ final class ShellTests: XCTestCase {
         pass.readTrace()
         let shell = ShellView(controller: pass)
         _ = shell.body
+        pass.matrixPickerOpen = true
+        _ = shell.body
+        pass.matrixPickerOpen = false
+        pass.presetPickerOpen = true
+        _ = shell.body
+        pass.presetPickerOpen = false
+        pass.settingsOpen = true
+        _ = shell.body
         XCTAssertEqual(pass.state.step, .delay)
-        let plot = MagnitudePlot(before: [point], after: nil)
+        let plot = MagnitudePlot(before: [point], after: nil, eq: summedEqResponse(bands: [
+            EqBand(index: 1, hz: 1000, gainDb: -3, q: 4)
+        ]))
         _ = plot.body
         let thumb = CurveThumb(points: BuiltInTargets.presets[0].points, selected: true)
         _ = thumb.body
