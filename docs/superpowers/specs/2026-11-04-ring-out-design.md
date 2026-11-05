@@ -2,9 +2,11 @@
 
 Date: 2026-11-04
 
+UI revised 2026-11-05: Ring Out is one page, with fewer surfaces than Calibration.
+
 Auto-Smaart Ring Out is a later mode of the same Mac app that owns system calibration. The operator uses it for a pre-show microphone ring-out so mic level can be pushed higher before the show. This document is the behavior spec for that mode only. It does not replace or edit the calibration design.
 
-Calibration remains the earlier mode, specified in [docs/superpowers/specs/2026-11-04-auto-calibration-design.md](./2026-11-04-auto-calibration-design.md). Ring Out is a separate mode: separate screen, separate controller, separate write path. The two modes share the DiGiCo Quantum 225 OSC console connection, the official Smaart API session, and one cross-mode **Stop** safety rule defined below. They do not share EQ fit, delay write, confirm-before-write, curve bank, or Matrix-only targeting.
+Calibration remains the earlier mode, specified in [docs/superpowers/specs/2026-11-04-auto-calibration-design.md](./2026-11-04-auto-calibration-design.md). Ring Out is a separate mode: one page, separate controller, separate write path. The two modes share the DiGiCo Quantum 225 OSC console connection, the official Smaart API session, and one cross-mode **Stop** safety rule defined below. They do not share EQ fit, delay write, confirm-before-write, curve bank, or Matrix-only targeting.
 
 This change adds the Ring Out behavior spec only. It does not add application code.
 
@@ -58,23 +60,19 @@ The app presents Calibration and Ring Out as separate modes. Opening Ring Out do
 
 ## Screen
 
-One Ring Out screen inside the same Auto-Smaart window. Visual tokens follow the approved design system used by calibration. This spec owns Ring Out behavior; draft captions that disagree with this spec lose.
+Ring Out is one page inside the same Auto-Smaart window. It is smaller than Calibration. Calibration keeps Pick / Delay / EQ / Compare. Ring Out does not add those steps, and it does not use a Setup → Running → Notch → Done sequence. The whole pass stays on this page. Visual tokens follow the approved design system used by calibration. This spec owns Ring Out behavior; draft captions that disagree with this spec lose.
 
-The Ring Out screen shows:
+The page has four regions:
 
-- Console host and OSC port (same fields the app already uses; the operator may edit them here when Ring Out is open and no loop is running)
-- Fader target type: **Input channel** or **Bus**
-- Fader target index for that type
-- EQ destination type: **Input channel** or **Bus**
-- EQ destination index for that type
-- Live RTA status (live only while the official API session is open and an RTA stream is available)
-- Current fader level, start fader, first-feedback fader (once known), and the +5.0 dB stop level derived from first feedback
-- The notch table: up to 8 rows of frequency, gain, and Q; unused rows are an em dash
-- Primary action **Start ring-out**
-- Quiet **Undo notches** when a notch snapshot exists
-- Always-visible destructive **Stop**
+**Top bar.** Smaart status and **Stop**. Status is `Smaart live` while the official API session is open, an RTA stream is available, and no notice is active. Otherwise the bar shows the notice from the Errors table, including `No RTA` when there is no stream. **Stop** is always available. It mutes all mics and all outputs.
 
-While the loop is running, target and destination controls are locked. Back / mode switch is refused until the loop is idle or Stop has finished muting.
+**Left.** A fader showing the current level in dB. The caption is that level to one decimal, or −∞. The fader graphic tracks the same level. It is a readout of the strip the loop is raising. The operator does not drag it. Start fader, first-feedback level, and the +5.0 dB stop level stay in the controller. They are not extra readouts on the page.
+
+**Top right.** The current channel or bus, which is the fader target. A click opens a popup to pick that channel or bus and where the EQ is written. Each pick is one row from Target lists: Input channel, or a Group, Aux, or Matrix bus, plus an index. The two picks may be the same strip or different strips. When they differ, the closed control shows the fader target and the EQ destination. The popup confirm is **Start ring-out**. Confirm stays disabled until the shared console host and OSC port are non-empty and an RTA stream is available, and while the loop is running. **Undo notches** is in that same popup, only while the loop is idle and a notch snapshot exists. Host and OSC port belong to the shared console connection. They are not fields on this page.
+
+**Bottom.** The RTA from 100 Hz to 8 kHz. The trace is the live official-API magnitude for bins in that span. Bins outside the span are not drawn. The trace uses the design-system live color. Each written cut is a mark in a second color, the design-system gold, at that notch’s frequency. A deeper cut on the same frequency stays one mark. There is no notch table on the page.
+
+While the loop is running, the top-right control is locked and the popup cannot change the target or the EQ destination. Leaving Ring Out for Calibration is refused until the loop is idle or Stop has finished muting.
 
 ## Inputs
 
@@ -104,7 +102,7 @@ If the API session is closed, or a read returns no RTA magnitude, there is no pe
 
 DiGiCo Quantum 225 only, over OSC, using the QLab DiGiCo dictionary. Same console family as calibration.
 
-The operator types the console IP and the OSC port before Start. Start stays disabled until both are non-empty and an RTA stream is available.
+The shared console connection holds the console IP and the OSC port. Those fields are not on the Ring Out page. Start stays disabled until both are non-empty and an RTA stream is available.
 
 ### Target lists
 
@@ -117,7 +115,7 @@ The app does not query the console for channel or bus counts. Fixed local lists:
 | Aux bus | Aux Outputs 1 through 24 |
 | Matrix bus | Matrix Outputs 1 through 12 |
 
-**Bus** on the screen means the operator first picks Group, Aux, or Matrix, then an index from that row. Fader target and EQ destination each use one row from these lists. They may be the same strip or different strips. A common pass raises an input-channel fader and writes notches on that same channel; another pass raises an input-channel fader and writes notches on a Group or Matrix bus.
+**Bus** in the popup means the operator first picks Group, Aux, or Matrix, then an index from that row. Fader target and EQ destination each use one row from these lists. They may be the same strip or different strips. A common pass raises an input-channel fader and writes notches on that same channel; another pass raises an input-channel fader and writes notches on a Group or Matrix bus.
 
 `<kind>` and `<n>` below are the selected type and index. Address prefixes:
 
@@ -165,7 +163,7 @@ Each mute argument is `1` (muted). Stop does not unmute. Stop does not clear not
 
 ## Flow
 
-1. The operator selects the fader target (channel or bus) and the EQ destination (channel or bus), confirms OSC host and port, and presses **Start ring-out**.
+1. The operator clicks the current channel or bus, picks the fader target (channel or bus) and where the EQ is written (channel or bus), and confirms with **Start ring-out**. Host and port are already set on the shared console connection.
 2. The app reads the current fader target value and stores it as **start fader**. It does not yet know first feedback.
 3. The app slowly raises the fader target: +0.5 dB every 200 ms, writing `P/fader` each step, while reading RTA. It does not raise while RTA is unavailable.
 4. On the first sustained peak, the app stores the current fader dB as **first-feedback fader** `F0`, and stores the stop level `F0 + 5.0` dB. It then writes the fader target to −∞ (fader write, not mute).
@@ -174,9 +172,9 @@ Each mute argument is `1` (muted). Stop does not unmute. Stop does not clear not
 7. On each later sustained peak: pull fader to −∞, write or deepen one notch, then raise again.
 8. After every successful raise step, if the fader level is at least `F0 + 5.0` dB, the loop stops as complete. If a sustained peak is declared before that level, go to step 7 instead. If a new peak needs a ninth band while 8 bands are already in use, the loop stops on the 8-band limit.
 
-When the +5.0 dB stop fires, the app leaves the fader at the step that crossed `F0 + 5.0` dB, leaves notches as written, and shows that the pass completed at +5.0 dB above first feedback. The operator may then back the fader off slightly by hand for extra safety margin. The app does not auto-back-off.
+When the +5.0 dB stop fires, the app leaves the fader at the step that crossed `F0 + 5.0` dB, leaves notches as written, and the top bar shows "Ring-out complete (+5 dB)." The page does not change. The operator may then back the fader off slightly by hand for extra safety margin. The app does not auto-back-off.
 
-When the 8-band stop fires, the app leaves the fader at −∞, leaves the 8 notches as written, and shows that all 8 bands are used before the +5.0 dB headroom was reached.
+When the 8-band stop fires, the app leaves the fader at −∞, leaves the 8 notches as written, and the top bar shows "8 bands used before +5 dB headroom." The page does not change.
 
 ## Notch rules
 
@@ -187,7 +185,7 @@ Notches are deterministic. The same sustained-peak frequency and the same curren
 When the sustained-peak frequency is not a match for any used band:
 
 - Use the lowest free band index from 1 through 8.
-- Frequency is the sustained-peak frequency in Hz, unrounded on the wire. The screen shows hertz rounded half away from zero to 1 Hz below 1000 Hz, and kilohertz to two decimal places at 1000 Hz and above.
+- Frequency is the sustained-peak frequency in Hz, unrounded on the wire. The RTA draws that notch at this frequency. Any frequency text on the mark or on the RTA axis shows hertz rounded half away from zero to 1 Hz below 1000 Hz, and kilohertz to two decimal places at 1000 Hz and above.
 - Gain is −3.0 dB.
 - Q is **16.00** for every new band. That is the program’s FIXED ring-out default: narrow enough for setup notches, inside the console Q range 0.10 through 20.00. The app does not widen Q to chase broadband energy.
 - Send freq, gain, Q, on for that band, in that order. Do not touch other bands.
@@ -219,13 +217,13 @@ At most 8 bands. A new peak that matches no used band while 8 bands are already 
 
 Ring Out auto-writes. Undo is how the operator backs out notches.
 
-After at least one successful notch write in the current pass, **Undo notches** is available while the loop is idle. It writes, band for band, the restore snapshot taken before the first notch write of this pass (the destination EQ as it was at Start). Bands that were unused at Start and written during the pass are turned off only by restoring the snapshot values read at Start for those indices; if Start had no read for an unused band, Undo sends nothing for that unused index and the operator clears it on the console.
+After at least one successful notch write in the current pass, **Undo notches** is available in the channel/bus popup while the loop is idle. It writes, band for band, the restore snapshot taken before the first notch write of this pass (the destination EQ as it was at Start). Bands that were unused at Start and written during the pass are turned off only by restoring the snapshot values read at Start for those indices; if Start had no read for an unused band, Undo sends nothing for that unused index and the operator clears it on the console.
 
 Undo does not change faders. Undo does not unmute. Undo is disabled while the loop is running.
 
 ## Stop safety (cross-mode)
 
-**Stop** is always available on the Ring Out screen, and the same Stop control with the same mute-all behavior is required on the calibration mode screens as a shared safety control.
+**Stop** is always in the Ring Out top bar. Pressing it mutes all mics and all outputs. The same mute-all behavior is required on the calibration mode screens as a shared safety control. This page does not rename Calibration’s control.
 
 When Stop is pressed in either mode:
 
@@ -280,6 +278,8 @@ Four test groups are required for Ring Out.
 
 **One real-hardware pass.** One microphone into one Quantum 225 input, RTA live from Smaart through the official API, notches written to a chosen Matrix (or input) EQ, Stop proven to mute all listed strips. Skipped unless the hardware environment is set.
 
+The Ring Out page is one view for the whole pass. A UI test must show the current-level fader, the channel/bus popup (fader target and EQ destination), the 100 Hz–8 kHz RTA with cut marks in a second color, and top-bar Smaart status and Stop. It must not require Setup, Running, Notch, or Done screens.
+
 ## Units that implement this
 
 An implementation plan for this spec splits along these boundaries. Each one can be tested without the others.
@@ -290,6 +290,6 @@ An implementation plan for this spec splits along these boundaries. Each one can
 | Fader driver | Read / slow raise / −∞ write for one target strip | Quantum 225 OSC fader address |
 | Notch writer | New band, deepen match, floor, restore, undo snapshot | Quantum 225 OSC EQ addresses |
 | Ring-out controller | Start, loop, +5 dB and 8-band stops, errors, Stop cancel | The three units above |
-| Ring Out screen | Target and destination pickers, notch table, Start, Undo, Stop | Ring-out controller |
+| Ring Out page | One page: current-level fader, channel/bus popup, RTA 100 Hz–8 kHz with cut notches in a second color, Smaart status, Stop | Ring-out controller |
 
-The fader driver and notch writer are the only writers during the loop. Stop mute-all may run from the shared safety path used by calibration. The RTA reader does not send OSC. The Ring Out screen sends nothing by itself.
+The fader driver and notch writer are the only writers during the loop. Stop mute-all may run from the shared safety path used by calibration. The RTA reader does not send OSC. The Ring Out page sends nothing by itself.
