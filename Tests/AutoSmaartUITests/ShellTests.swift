@@ -38,7 +38,7 @@ final class ShellTests: XCTestCase {
         _ = eq.body
         _ = compare.body
         XCTAssertTrue(pass.state.presets.map(\.name).contains("Flat"))
-        XCTAssertTrue(pass.state.presets.map(\.name).contains("Haystack"))
+        XCTAssertEqual(pass.state.presets.prefix(3).map(\.name), ["Flat", "Speech", "Music"])
         pass.readTrace()
         let shell = CalibrationShell(controller: pass)
         _ = shell.body

@@ -1,17 +1,17 @@
 import Foundation
 
-/// Starting target shapes for the curve list. Speaker-realistic; not cinema X-curve.
+/// Suggested starting targets. Ear / Haystack stay as user bank curves, not defaults.
 public enum BuiltInTargets {
-    public static let names: Set<String> = ["Flat", "Speech", "Music", "Haystack"]
+    public static let names: Set<String> = ["Flat", "Speech", "Music"]
 
     public static let presets: [CurvePreset] = [
         CurvePreset(name: "Flat", kind: .target, points: curve(flatNearly)),
         CurvePreset(name: "Speech", kind: .target, points: curve(speech)),
-        CurvePreset(name: "Music", kind: .target, points: curve(music)),
-        CurvePreset(name: "Haystack", kind: .target, points: curve(haystack))
+        CurvePreset(name: "Music", kind: .target, points: curve(music))
     ]
 
     /// Merge built-ins with bank presets. Bank entries with the same name replace the built-in.
+    /// User curves such as Ear or Haystack appear after the three defaults.
     public static func merge(bank: [CurvePreset]) -> [CurvePreset] {
         let byName = Dictionary(uniqueKeysWithValues: bank.map { ($0.name, $0) })
         var merged = presets.map { byName[$0.name] ?? $0 }
@@ -30,46 +30,34 @@ public enum BuiltInTargets {
         frequencies.map { MagnitudePoint(hz: $0, db: dbAt($0), phase: 0) }
     }
 
-    /// Nearly-flat reference that is visibly not a ruler, with a rising HF tilt for ear behavior
-    /// (more energy in the highs).
+    /// Near-flat reference. Tiny mid ripple only — no rising high-frequency slope.
     private static func flatNearly(_ hz: Double) -> Double {
-        // Soft mid undulation so the graph is not a perfect line.
-        let ripple = 0.35 * sin(log2(max(hz, 20) / 200) * .pi)
-        if hz <= 1000 {
-            return ripple
-        }
-        // Rising high-frequency tilt: ~+4 dB by 10 kHz, ~+5.5 dB by 16 kHz.
-        let octaves = log2(hz / 1000)
-        return ripple + 1.6 * octaves
+        0.15 * sin(log2(max(hz, 20) / 500) * .pi)
     }
 
-    /// Speech: less bass, then a clear high-frequency rise for presence / intelligibility.
+    /// Speech: less low end, flatter 125 Hz–8 kHz, no HF rise (intelligibility band).
     private static func speech(_ hz: Double) -> Double {
-        if hz <= 80 { return -5 }
-        if hz < 250 {
-            return -5 + 5 * (log(hz / 80) / log(250.0 / 80.0))
+        if hz < 125 {
+            // Less LF; settles to the flat speech band at 125 Hz.
+            return -3.5 * (1 - log(max(hz, 20) / 20) / log(125.0 / 20.0))
         }
-        let midRipple = 0.2 * sin(log2(max(hz, 250) / 500) * .pi)
-        if hz < 1000 { return midRipple }
-        // Rising highs: ~+3.5 dB by 8 kHz, ~+4.6 dB by 10 kHz, ~+5.6 dB by 16 kHz.
-        let octaves = log2(hz / 1000)
-        return midRipple + 1.4 * octaves
+        if hz <= 8000 {
+            // Near-flat through the scored speech band.
+            return 0.1 * sin(log2(hz / 500) * .pi)
+        }
+        // Hold the 8 kHz level through the top octave — do not ask for more highs.
+        return speech(8000)
     }
 
-    /// Music: low lift with a gentle downward tilt through the band.
+    /// Music: one low-frequency shelf of a few dB, then flat. Not a long tilt.
     private static func music(_ hz: Double) -> Double {
-        if hz <= 80 { return 4 }
-        if hz < 200 {
-            return 4 * (1 - log(hz / 80) / log(200.0 / 80.0))
+        let shelfDb = 3.0
+        let corner = 100.0
+        let flatBy = 200.0
+        if hz <= corner { return shelfDb }
+        if hz < flatBy {
+            return shelfDb * (1 - log(hz / corner) / log(flatBy / corner))
         }
-        // ~0.7 dB/octave downward from 200 Hz.
-        return -0.7 * log2(hz / 200)
-    }
-
-    /// Low haystack: modest bass rise that settles by ~250 Hz.
-    private static func haystack(_ hz: Double) -> Double {
-        if hz <= 40 { return 5 }
-        if hz >= 250 { return 0.15 * sin(log2(hz / 500) * .pi) }
-        return 5 * (1 - log(hz / 40) / log(250.0 / 40.0))
+        return 0
     }
 }

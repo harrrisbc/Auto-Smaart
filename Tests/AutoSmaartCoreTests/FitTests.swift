@@ -11,29 +11,29 @@ final class FitTests: XCTestCase {
     }
 
     func testInterpolationUsesNaturalLog() throws {
-        let preset = [MagnitudePoint(hz: 100, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: -6, phase: 40)]
+        let preset = [MagnitudePoint(hz: 125, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: -6, phase: 40)]
         let measurement = [MagnitudePoint(hz: 316.22776601683796, db: 0, phase: 0)]
         let result = fitEq(measurement: measurement, preset: preset)
         guard case .bands(let bands) = result else { return XCTFail("\(result)") }
-        XCTAssertEqual(try XCTUnwrap(bands.first).gainDb, -3.0, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(bands.first).gainDb, -2.7, accuracy: 1e-9)
         XCTAssertEqual(try XCTUnwrap(bands.first).hz, 316.22776601683796, accuracy: 1e-6)
     }
 
     func testDuplicatePresetFrequencyKeepsTheFirstPoint() {
         let preset = [
-            MagnitudePoint(hz: 100, db: 0, phase: 0),
-            MagnitudePoint(hz: 100, db: 5, phase: 0),
+            MagnitudePoint(hz: 200, db: 0, phase: 0),
+            MagnitudePoint(hz: 200, db: 5, phase: 0),
             MagnitudePoint(hz: 1000, db: 0, phase: 0)
         ]
-        let measurement = [MagnitudePoint(hz: 100, db: 0.2, phase: 0)]
+        let measurement = [MagnitudePoint(hz: 200, db: 0.2, phase: 0)]
         XCTAssertEqual(fitEq(measurement: measurement, preset: preset), .bands([]))
     }
 
     func testAbsoluteDeviationAtOrBelowOneProducesZeroBands() throws {
         let fixture = try load("flat-within-1db")
         XCTAssertEqual(fitEq(measurement: fixture.measurement, preset: fixture.preset), .bands([]))
-        let justOver = [MagnitudePoint(hz: 100, db: 1.04, phase: 0)]
-        let preset = [MagnitudePoint(hz: 100, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: 0, phase: 0)]
+        let justOver = [MagnitudePoint(hz: 200, db: 1.04, phase: 0)]
+        let preset = [MagnitudePoint(hz: 200, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: 0, phase: 0)]
         guard case .bands(let bands) = fitEq(measurement: justOver, preset: preset) else { return XCTFail("expected bands") }
         XCTAssertEqual(try XCTUnwrap(bands.first).gainDb, -1.0, accuracy: 1e-9)
         XCTAssertEqual(try XCTUnwrap(bands.first).q, 4.0, accuracy: 1e-9)
@@ -47,9 +47,22 @@ final class FitTests: XCTestCase {
         // One peaking cut clears the +6 dB bin; unused bands stay empty.
         XCTAssertEqual(bands.count, 1)
         XCTAssertEqual(bands[0].index, 1)
-        XCTAssertEqual(bands[0].hz, 100, accuracy: 1e-9)
+        XCTAssertEqual(bands[0].hz, 200, accuracy: 1e-9)
         XCTAssertEqual(bands[0].gainDb, -6.0, accuracy: 1e-9)
         XCTAssertEqual(bands[0].q, 4.0, accuracy: 1e-9)
+    }
+
+    func testFitIgnoresBelow125AndTopOctave() {
+        let measurement = [
+            MagnitudePoint(hz: 40, db: 12, phase: 0),
+            MagnitudePoint(hz: 1000, db: 0.2, phase: 0),
+            MagnitudePoint(hz: 16000, db: 12, phase: 0)
+        ]
+        let preset = [
+            MagnitudePoint(hz: 20, db: 0, phase: 0),
+            MagnitudePoint(hz: 20000, db: 0, phase: 0)
+        ]
+        XCTAssertEqual(fitEq(measurement: measurement, preset: preset), .bands([]))
     }
 
     func testTieGoesToTheLowerFrequencyAndLobeSetsQ() {
@@ -93,9 +106,10 @@ final class FitTests: XCTestCase {
             return XCTFail("expected bands")
         }
         XCTAssertEqual(bands.count, 1, "broad low-only rise must not burn all 8 bands")
-        XCTAssertLessThan(bands[0].hz, 250)
+        XCTAssertGreaterThanOrEqual(bands[0].hz, fitBandLowHz)
+        XCTAssertLessThanOrEqual(bands[0].hz, 250)
         XCTAssertLessThan(bands[0].gainDb, -1)
-        XCTAssertLessThan(bands[0].q, 4)
+        XCTAssertLessThanOrEqual(bands[0].q, 5)
     }
 
     func testPhaseDoesNotChangeTheBands() throws {
@@ -115,9 +129,14 @@ final class FitTests: XCTestCase {
     func testNoOverlapAndOutOfBandBins() throws {
         let missing = try load("no-overlap")
         XCTAssertEqual(fitEq(measurement: missing.measurement, preset: missing.preset), .noOverlap)
-        let measurement = [MagnitudePoint(hz: 19.999, db: 12, phase: 0), MagnitudePoint(hz: 20, db: 0.2, phase: 0)]
+        let outsideFitBand = [
+            MagnitudePoint(hz: 40, db: 12, phase: 0),
+            MagnitudePoint(hz: 16000, db: 12, phase: 0)
+        ]
         let preset = [MagnitudePoint(hz: 10, db: 0, phase: 0), MagnitudePoint(hz: 20000, db: 0, phase: 0)]
-        XCTAssertEqual(fitEq(measurement: measurement, preset: preset), .bands([]))
+        XCTAssertEqual(fitEq(measurement: outsideFitBand, preset: preset), .noOverlap)
+        let quietInBand = [MagnitudePoint(hz: 1000, db: 0.2, phase: 0)]
+        XCTAssertEqual(fitEq(measurement: quietInBand, preset: preset), .bands([]))
     }
 
     func testSummedResponseMatchesTheBandAtItsCenter() {

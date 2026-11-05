@@ -59,8 +59,15 @@ public func summedEqResponse(bands: [EqBand], samples: Int = 128) -> [MagnitudeP
     return summedEqResponse(bands: bands, at: frequencies)
 }
 
+/// Live-sound bells earn their place in the controlled band. Below ~125 Hz is
+/// coupling / subs; the top octave is air and coherence — neither is chased with peaking EQ.
+public let fitBandLowHz = 125.0
+public let fitBandHighHz = 8000.0
+
 public func fitEq(measurement: [MagnitudePoint], preset: [MagnitudePoint]) -> FitResult {
-    let bins = measurement.filter { $0.hz >= 20 && $0.hz <= 20000 }.sorted { $0.hz < $1.hz }
+    let bins = measurement
+        .filter { $0.hz >= fitBandLowHz && $0.hz <= fitBandHighHz }
+        .sorted { $0.hz < $1.hz }
     let presetPoints = uniquePreset(preset)
     guard let first = presetPoints.first, let last = presetPoints.last else { return .noOverlap }
     var deviation: [(hz: Double, db: Double)] = []
