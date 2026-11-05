@@ -112,7 +112,7 @@ public struct ShellView: View {
         return MagnitudePlot(
             before: trace,
             after: controller.state.afterCurve,
-            eq: summedEqResponse(bands: bands)
+            bands: bands
         )
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

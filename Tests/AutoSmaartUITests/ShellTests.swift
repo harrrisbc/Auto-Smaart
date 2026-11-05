@@ -51,10 +51,14 @@ final class ShellTests: XCTestCase {
         pass.settingsOpen = true
         _ = shell.body
         XCTAssertEqual(pass.state.step, .delay)
-        let plot = MagnitudePlot(before: [point], after: nil, eq: summedEqResponse(bands: [
+        let plot = MagnitudePlot(before: [point], after: nil, bands: [
             EqBand(index: 1, hz: 1000, gainDb: -3, q: 4)
-        ]))
+        ])
         _ = plot.body
+        XCTAssertEqual(
+            BandHoverText.readout(EqBand(index: 2, hz: 1000, gainDb: -3, q: 16)),
+            "1.00 kHz · Q 16.00 · -3.0 dB"
+        )
         let thumb = CurveThumb(points: BuiltInTargets.presets[0].points, selected: true)
         _ = thumb.body
     }
