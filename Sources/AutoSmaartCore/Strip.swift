@@ -7,6 +7,26 @@ public enum StripKind: String, Equatable, Codable, CaseIterable {
     case matrixBus
 }
 
+/// Calibration page bus choice. Mix maps to Digico Aux mixes.
+public enum CalibrationBusKind: String, Equatable, Codable, CaseIterable {
+    case mix
+    case matrix
+
+    public var stripKind: StripKind {
+        switch self {
+        case .mix: return .auxBus
+        case .matrix: return .matrixBus
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .mix: return "Mix"
+        case .matrix: return "Matrix"
+        }
+    }
+}
+
 public func stripIndexRange(_ kind: StripKind) -> ClosedRange<Int> {
     switch kind {
     case .inputChannel: return 1...72

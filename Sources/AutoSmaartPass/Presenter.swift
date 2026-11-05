@@ -3,7 +3,7 @@ import AutoSmaartCore
 
 public enum PassPresenter {
     public static let pickTitle = "Pick output"
-    public static let pickSupporting = "One Matrix output. One curve. The console is not written on this step."
+    public static let pickSupporting = "One Mix or Matrix bus. One curve. The console is not written on this step."
     public static let settingsTitle = "Settings"
     public static let settingsSupporting = "Console OSC and which Smaart transfer function to read."
     public static let delayTitle = "Delay"
@@ -16,7 +16,7 @@ public enum PassPresenter {
     public static let stop = "Stop"
     public static let start = "Start"
     public static let mute = "Mute"
-    public static let mix = "Mix"
+    public static let unmute = "Unmute"
     public static let settings = "Settings"
     public static let storeTarget = "Store target"
     public static let storeTrace = "Store trace"
@@ -33,11 +33,8 @@ public enum PassPresenter {
         live ? "Smaart connected" : "Smaart not connected"
     }
 
-    /// Smaart library name for a captured TF: selected Matrix channel + read count.
-    public static func capturedTraceName(output: Int, displayName: String, readNumber: Int) -> String {
-        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let channel = trimmed.isEmpty ? "Matrix \(output)" : trimmed
-        return "\(channel) \(readNumber)"
+    public static func busLabel(kind: CalibrationBusKind, index: Int) -> String {
+        "\(kind.label) \(index)"
     }
 
     public static func eqSupporting(bandCount: Int) -> String {
@@ -81,7 +78,19 @@ public enum PassPresenter {
         case .noEqNeeded: return "No EQ is needed."
         case .noEqWritten: return "No EQ was written."
         case .matrixMuteIncomplete: return "Mute failed. Check the console."
-        case .matrixMixIncomplete: return "Mix failed. Check the console."
+        case .matrixUnmuteIncomplete: return "Unmute failed. Check the console."
+        }
+    }
+
+    public static func selectedBusRecord(_ state: PassState) -> MatrixOutputRecord? {
+        guard let output = state.selectedOutput else { return nil }
+        switch state.busKind {
+        case .matrix:
+            guard state.outputs.indices.contains(output - 1) else { return nil }
+            return state.outputs[output - 1]
+        case .mix:
+            guard state.mixOutputs.indices.contains(output - 1) else { return nil }
+            return state.mixOutputs[output - 1]
         }
     }
 
@@ -153,10 +162,7 @@ public enum PassPresenter {
 
     public static func compareLines(_ state: PassState) -> [String] {
         var lines: [String] = []
-        if let output = state.selectedOutput,
-           state.outputs.indices.contains(output - 1),
-           let snapshot = state.outputs[output - 1].delaySnapshot,
-           let shown = state.displayedDelayMs {
+        if let snapshot = selectedBusRecord(state)?.delaySnapshot, let shown = state.displayedDelayMs {
             lines.append("Delay \(oneDecimal(snapshot.delay)) ms → \(String(format: "%.1f", shown)) ms")
         }
         let count = state.bands?.count ?? 0
@@ -167,18 +173,16 @@ public enum PassPresenter {
     }
 
     public static func showsUndoDelay(_ state: PassState) -> Bool {
-        guard let output = state.selectedOutput, state.outputs.indices.contains(output - 1) else { return false }
-        return state.outputs[output - 1].delaySnapshot != nil
+        selectedBusRecord(state)?.delaySnapshot != nil
     }
 
     public static func showsUndoLastWrite(_ state: PassState) -> Bool {
-        guard state.step == .compare, let output = state.selectedOutput, state.outputs.indices.contains(output - 1) else { return false }
-        let row = state.outputs[output - 1]
+        guard state.step == .compare, let row = selectedBusRecord(state) else { return false }
         return row.delaySnapshot != nil || row.eqSnapshot != nil
     }
 
     public static func selectionSummary(_ state: PassState) -> String {
-        let output = state.selectedOutput.map { "Matrix \($0)" } ?? "No output"
+        let output = state.selectedOutput.map { busLabel(kind: state.busKind, index: $0) } ?? "No output"
         let preset = state.passPresetName ?? "No preset"
         return "\(output) · \(preset)"
     }

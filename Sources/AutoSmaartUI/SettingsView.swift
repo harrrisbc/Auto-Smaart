@@ -19,15 +19,24 @@ public struct SettingsView: View {
                 labeledField("Transfer function name", text: tfName, placeholder: "Blank = first active TF")
             }
 
-            HStack {
-                TextField("Curve name", text: draft)
-                QuietButton(title: PassPresenter.storeTarget) { controller.storeTarget() }
-                    .disabled(!PassPresenter.storeEnabled(controller.state))
-                QuietButton(title: PassPresenter.storeTrace) { controller.storeTrace() }
-                    .disabled(!PassPresenter.storeEnabled(controller.state))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Curve / capture name")
+                    .font(.custom("Inter", size: 11).weight(.medium))
+                    .tracking(0.88)
+                    .foregroundStyle(Theme.lightGold)
+                Text("Names the Smaart TF capture on Read, and bank store target/trace.")
+                    .font(.custom("Inter", size: 12))
+                    .foregroundStyle(Theme.secondary)
+                HStack {
+                    TextField("Name", text: draft)
+                    QuietButton(title: PassPresenter.storeTarget) { controller.storeTarget() }
+                        .disabled(!PassPresenter.storeEnabled(controller.state))
+                    QuietButton(title: PassPresenter.storeTrace) { controller.storeTrace() }
+                        .disabled(!PassPresenter.storeEnabled(controller.state))
+                }
+                .textFieldStyle(.plain)
+                .font(.custom("Inter", size: 13))
             }
-            .textFieldStyle(.plain)
-            .font(.custom("Inter", size: 13))
 
             Spacer()
         }

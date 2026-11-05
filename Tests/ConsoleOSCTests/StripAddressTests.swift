@@ -38,6 +38,15 @@ final class StripAddressTests: XCTestCase {
     func testMuteAddressFollowsStripKind() throws {
         XCTAssertEqual(try muteAddress(kind: .inputChannel, index: 7), "/sd/Input_Channels/7/mute")
         XCTAssertEqual(try muteAddress(kind: .matrixBus, index: 3), "/sd/Matrix_Outputs/3/mute")
+        XCTAssertEqual(try muteAddress(kind: .auxBus, index: 5), "/sd/Aux_Outputs/5/mute")
+    }
+
+    func testDelayAddressesForMixAndMatrix() throws {
+        let matrix = try delayAddresses(kind: .matrixBus, index: 2)
+        XCTAssertEqual(matrix.delay, "/sd/Matrix_Outputs/2/Channel_Delay/delay")
+        let mix = try delayAddresses(kind: .auxBus, index: 4)
+        XCTAssertEqual(mix.delay, "/sd/Aux_Outputs/4/Channel_Delay/delay")
+        XCTAssertThrowsError(try delayAddresses(kind: .inputChannel, index: 1))
     }
 
     func testMuteAllWritesIntOneAndContinuesAfterFailure() throws {

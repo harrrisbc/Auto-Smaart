@@ -24,11 +24,33 @@ public struct PickView: View {
 
     private var matrixTable: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header("Matrix", "Name", "Last write")
-            ForEach(controller.state.outputs, id: \.index) { row in
-                Button { controller.selectOutput(row.index) } label: {
+            HStack(spacing: 8) {
+                ForEach(CalibrationBusKind.allCases, id: \.self) { kind in
+                    Button {
+                        let index = controller.state.selectedOutput
+                            .map { min(max($0, stripIndexRange(kind.stripKind).lowerBound), stripIndexRange(kind.stripKind).upperBound) }
+                            ?? 1
+                        controller.selectBus(kind: kind, index: index)
+                    } label: {
+                        Text(kind.label)
+                            .font(.custom("Inter", size: 12).weight(.semibold))
+                            .foregroundStyle(controller.state.busKind == kind ? Theme.text : Theme.secondary)
+                            .padding(.horizontal, 10)
+                            .frame(height: 28)
+                            .background(controller.state.busKind == kind ? Theme.selectedRow : Theme.raised)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.stroke))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(.bottom, 8)
+            header(controller.state.busKind.label, "Name", "Last write")
+            ForEach(busRows, id: \.index) { row in
+                Button { controller.selectBus(kind: controller.state.busKind, index: row.index) } label: {
                     HStack {
-                        Text("Matrix \(row.index)").frame(maxWidth: .infinity, alignment: .leading)
+                        Text(PassPresenter.busLabel(kind: controller.state.busKind, index: row.index))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         TextField("", text: name(row.index)).frame(maxWidth: .infinity)
                         Text(PassPresenter.lastWriteLabel(row.lastWrite)).frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -42,6 +64,13 @@ public struct PickView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    private var busRows: [MatrixOutputRecord] {
+        switch controller.state.busKind {
+        case .matrix: return controller.state.outputs
+        case .mix: return controller.state.mixOutputs
         }
     }
 
@@ -81,8 +110,13 @@ public struct PickView: View {
 
     private func name(_ index: Int) -> Binding<String> {
         Binding(
-            get: { controller.state.outputs[index - 1].displayName },
-            set: { controller.setDisplayName($0, output: index) }
+            get: {
+                switch controller.state.busKind {
+                case .matrix: return controller.state.outputs[index - 1].displayName
+                case .mix: return controller.state.mixOutputs[index - 1].displayName
+                }
+            },
+            set: { controller.setDisplayName($0, kind: controller.state.busKind, output: index) }
         )
     }
 }

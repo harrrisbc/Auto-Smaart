@@ -37,8 +37,17 @@ public func eqAddresses(kind: StripKind, index: Int, band: Int) throws -> (freq:
 }
 
 public func delayAddresses(output: Int) throws -> (delay: String, fineDelay: String) {
-    guard (1...12).contains(output) else { throw AddressError.outputOutOfRange }
-    let prefix = try stripPrefix(kind: .matrixBus, index: output) + "/Channel_Delay"
+    try delayAddresses(kind: .matrixBus, index: output)
+}
+
+public func delayAddresses(kind: StripKind, index: Int) throws -> (delay: String, fineDelay: String) {
+    switch kind {
+    case .matrixBus, .auxBus:
+        break
+    case .inputChannel, .groupBus:
+        throw AddressError.stripOutOfRange
+    }
+    let prefix = try stripPrefix(kind: kind, index: index) + "/Channel_Delay"
     return (prefix + "/delay", prefix + "/fine_delay")
 }
 
