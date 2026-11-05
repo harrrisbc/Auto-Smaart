@@ -17,6 +17,8 @@ public enum PassNotice: Equatable {
     case writeFailedMismatch
     case noEqNeeded
     case noEqWritten
+    case matrixMuteIncomplete
+    case matrixMixIncomplete
 }
 
 public struct PassState: Equatable {
@@ -168,6 +170,29 @@ public final class PassController: ObservableObject {
         }
         guard reader.isSessionOpen else { return }
         try? reader.setSignalGeneratorActive(true)
+    }
+
+    /// Mutes only the Matrix output selected on this page.
+    public func muteSelectedMatrix() {
+        writeSelectedMatrixMute(active: true)
+    }
+
+    /// Unmutes only the Matrix output selected on this page (Mix).
+    public func mixSelectedMatrix() {
+        writeSelectedMatrixMute(active: false)
+    }
+
+    private func writeSelectedMatrixMute(active: Bool) {
+        guard let output = state.selectedOutput else { return }
+        do {
+            let address = try matrixMuteAddress(output: output)
+            try link.write(address: address, value: .int32(active ? 1 : 0))
+            if state.notice == .matrixMuteIncomplete || state.notice == .matrixMixIncomplete {
+                state.notice = .none
+            }
+        } catch {
+            state.notice = active ? .matrixMuteIncomplete : .matrixMixIncomplete
+        }
     }
 
     public func readTrace() {

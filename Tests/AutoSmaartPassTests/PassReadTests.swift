@@ -1,5 +1,6 @@
 import XCTest
 import AutoSmaartCore
+import ConsoleOSC
 @testable import AutoSmaartPass
 
 @MainActor
@@ -177,6 +178,24 @@ final class PassReadTests: XCTestCase {
         pass.startGenerator()
         XCTAssertEqual(reader.generatorActiveLog, [false, true])
         XCTAssertTrue(reader.isSessionOpen)
+    }
+
+    func testMuteAndMixTargetOnlySelectedMatrix() throws {
+        let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
+        let (pass, _, link, _) = makePass(traces: [capture(magnitude: [point], finder: 4)])
+        try prepare(pass, points: [point])
+        pass.selectOutput(3)
+        pass.muteSelectedMatrix()
+        XCTAssertEqual(link.log.count, 1)
+        XCTAssertEqual(link.log[0].op, "write")
+        XCTAssertEqual(link.log[0].address, try matrixMuteAddress(output: 3))
+        XCTAssertEqual(link.log[0].value, .int32(1))
+        pass.mixSelectedMatrix()
+        XCTAssertEqual(link.log.count, 2)
+        XCTAssertEqual(link.log[1].address, try matrixMuteAddress(output: 3))
+        XCTAssertEqual(link.log[1].value, .int32(0))
+        XCTAssertFalse(link.log.contains { $0.address.contains("Input_Channels") })
+        XCTAssertEqual(link.log.filter { $0.address.hasSuffix("/mute") }.count, 2)
     }
 
     func testNoTargetCurveNotice() {

@@ -11,6 +11,11 @@ public func delayAddresses(output: Int) throws -> (delay: String, fineDelay: Str
     return (prefix + "/delay", prefix + "/fine_delay")
 }
 
+public func matrixMuteAddress(output: Int) throws -> String {
+    guard (1...12).contains(output) else { throw AddressError.outputOutOfRange }
+    return "/sd/Matrix_Outputs/\(output)/mute"
+}
+
 public func eqAddresses(output: Int, band: Int) throws -> (freq: String, gain: String, q: String, on: String) {
     guard (1...12).contains(output) else { throw AddressError.outputOutOfRange }
     guard (1...8).contains(band) else { throw AddressError.bandOutOfRange }

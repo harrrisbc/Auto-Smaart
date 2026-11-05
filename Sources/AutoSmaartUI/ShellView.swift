@@ -38,6 +38,8 @@ public struct ShellView: View {
             }
             Spacer()
             QuietButton(title: PassPresenter.settings) { openSettings() }
+            QuietButton(title: PassPresenter.mix) { controller.mixSelectedMatrix() }
+            QuietButton(title: PassPresenter.mute) { controller.muteSelectedMatrix() }
             QuietButton(title: PassPresenter.start) { controller.startGenerator() }
             QuietButton(title: PassPresenter.stop) { controller.stop() }
         }
