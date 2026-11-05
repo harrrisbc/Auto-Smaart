@@ -6,8 +6,8 @@ import ConsoleOSC
 @MainActor
 final class PassUndoTests: XCTestCase {
     func testUndoDelayWritesOnlyTheDelaySnapshot() throws {
-        let point = MagnitudePoint(hz: 100, db: 0.2, phase: 0)
-        let preset = [MagnitudePoint(hz: 100, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: 0, phase: 0)]
+        let point = MagnitudePoint(hz: 200, db: 0.2, phase: 0)
+        let preset = [MagnitudePoint(hz: 200, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: 0, phase: 0)]
         let link = RecordingLink(values: [
             "/sd/Matrix_Outputs/1/Channel_Delay/delay": .float32(0),
             "/sd/Matrix_Outputs/1/Channel_Delay/fine_delay": .float32(7)
@@ -34,8 +34,8 @@ final class PassUndoTests: XCTestCase {
     }
 
     func testCompareUndoWritesDelayAndOnlySnapshotBands() throws {
-        let loud = MagnitudePoint(hz: 100, db: 6, phase: 0)
-        let flat = [MagnitudePoint(hz: 100, db: 0, phase: 0), MagnitudePoint(hz: 10000, db: 0, phase: 0)]
+        let loud = MagnitudePoint(hz: 200, db: 6, phase: 0)
+        let flat = [MagnitudePoint(hz: 200, db: 0, phase: 0), MagnitudePoint(hz: 10000, db: 0, phase: 0)]
         let link = RecordingLink(values: [
             "/sd/Matrix_Outputs/1/Channel_Delay/delay": .float32(1),
             "/sd/Matrix_Outputs/1/Channel_Delay/fine_delay": .float32(1)
@@ -56,15 +56,15 @@ final class PassUndoTests: XCTestCase {
         let delay = try delayAddresses(output: 1)
         XCTAssertEqual(Array(undo.prefix(2).map(\.address)), [delay.delay, delay.fineDelay])
         XCTAssertEqual(undo.prefix(2).map(\.value), [.float32(1), .float32(1)])
-        XCTAssertEqual(undo.filter { $0.address.contains("/EQ/") }.count, 32)
+        XCTAssertEqual(undo.filter { $0.address.contains("/EQ/") }.count, 4)
         XCTAssertFalse(undo.contains { $0.address.contains("eq_freq_9") })
         XCTAssertEqual(pass.state.outputs[0].lastWrite, lastWrite)
         XCTAssertNotNil(pass.state.outputs[0].eqSnapshot)
     }
 
     func testUndoFailureDoesNotChangeTheSnapshotOrLastWrite() throws {
-        let point = MagnitudePoint(hz: 100, db: 0.2, phase: 0)
-        let preset = [MagnitudePoint(hz: 100, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: 0, phase: 0)]
+        let point = MagnitudePoint(hz: 200, db: 0.2, phase: 0)
+        let preset = [MagnitudePoint(hz: 200, db: 0, phase: 0), MagnitudePoint(hz: 1000, db: 0, phase: 0)]
         let link = RecordingLink(values: [
             "/sd/Matrix_Outputs/1/Channel_Delay/delay": .float32(3),
             "/sd/Matrix_Outputs/1/Channel_Delay/fine_delay": .float32(3)

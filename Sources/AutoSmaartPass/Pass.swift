@@ -18,7 +18,7 @@ public enum PassNotice: Equatable {
     case noEqNeeded
     case noEqWritten
     case matrixMuteIncomplete
-    case matrixMixIncomplete
+    case matrixUnmuteIncomplete
 }
 
 public struct PassState: Equatable {
@@ -28,9 +28,11 @@ public struct PassState: Equatable {
     public var draftName = ""
     /// Optional Smaart TF measurement name (e.g. "hi"). Blank → first active TF.
     public var transferFunctionName = ""
+    public var busKind: CalibrationBusKind = .matrix
     public var selectedOutput: Int?
     public var passPresetName: String?
     public var outputs: [MatrixOutputRecord] = []
+    public var mixOutputs: [MatrixOutputRecord] = []
     public var presets: [CurvePreset] = []
     public var latestMagnitude: [MagnitudePoint]?
     public var suggestionRaw: Double?
@@ -46,8 +48,6 @@ public struct PassState: Equatable {
     public var delayWrittenThisPass = false
     public var compareOpen = false
     public var eqRemeasureFailed = false
-    /// Per Matrix output index: how many successful Reads have captured a Smaart TF.
-    public var readCounts: [Int: Int] = [:]
 
     public init() {}
 }
@@ -75,6 +75,7 @@ public final class PassController: ObservableObject {
         var initial = PassState()
         initial.presets = BuiltInTargets.merge(bank: bank.presets)
         initial.outputs = outputs.outputs
+        initial.mixOutputs = outputs.mixOutputs
         initial.smaartLive = reader.isSessionOpen
         state = initial
     }
@@ -93,6 +94,33 @@ public final class PassController: ObservableObject {
         try? bank.reload()
         state.presets = BuiltInTargets.merge(bank: bank.presets)
         state.outputs = outputs.outputs
+        state.mixOutputs = outputs.mixOutputs
+    }
+
+    private func persistOutputs() {
+        try? outputs.save(matrix: state.outputs, mix: state.mixOutputs)
+    }
+
+    private func withBusRecord(output: Int, _ body: (inout MatrixOutputRecord) -> Void) {
+        switch state.busKind {
+        case .matrix:
+            guard state.outputs.indices.contains(output - 1) else { return }
+            body(&state.outputs[output - 1])
+        case .mix:
+            guard state.mixOutputs.indices.contains(output - 1) else { return }
+            body(&state.mixOutputs[output - 1])
+        }
+    }
+
+    private func busRecord(output: Int) -> MatrixOutputRecord? {
+        switch state.busKind {
+        case .matrix:
+            guard state.outputs.indices.contains(output - 1) else { return nil }
+            return state.outputs[output - 1]
+        case .mix:
+            guard state.mixOutputs.indices.contains(output - 1) else { return nil }
+            return state.mixOutputs[output - 1]
+        }
     }
 
     func storePreparedPreset(name: String, kind: CurveKind, points: [MagnitudePoint]) throws {
@@ -105,17 +133,31 @@ public final class PassController: ObservableObject {
     }
 
     public func selectOutput(_ index: Int) {
-        guard (1...12).contains(index) else { return }
+        selectBus(kind: state.busKind, index: index)
+    }
+
+    public func selectBus(kind: CalibrationBusKind, index: Int) {
+        guard kind.indexRange.contains(index) else { return }
         state.smaartLive = reader.isSessionOpen
-        if state.selectedOutput == index { return }
+        if state.busKind == kind, state.selectedOutput == index { return }
+        state.busKind = kind
         state.selectedOutput = index
         clearPassProgress()
     }
 
     public func setDisplayName(_ name: String, output: Int) {
-        guard (1...12).contains(output) else { return }
-        state.outputs[output - 1].displayName = name
-        try? outputs.save(state.outputs)
+        setDisplayName(name, kind: .matrix, output: output)
+    }
+
+    public func setDisplayName(_ name: String, kind: CalibrationBusKind, output: Int) {
+        guard kind.indexRange.contains(output) else { return }
+        switch kind {
+        case .matrix:
+            state.outputs[output - 1].displayName = name
+        case .mix:
+            state.mixOutputs[output - 1].displayName = name
+        }
+        persistOutputs()
     }
 
     public func recall(name: String) {
@@ -172,26 +214,26 @@ public final class PassController: ObservableObject {
         try? reader.setSignalGeneratorActive(true)
     }
 
-    /// Mutes only the Matrix output selected on this page.
+    /// Mutes only the Mix/Matrix bus selected on this page.
     public func muteSelectedMatrix() {
-        writeSelectedMatrixMute(active: true)
+        writeSelectedBusMute(active: true)
     }
 
-    /// Unmutes only the Matrix output selected on this page (Mix).
-    public func mixSelectedMatrix() {
-        writeSelectedMatrixMute(active: false)
+    /// Unmutes only the Mix/Matrix bus selected on this page.
+    public func unmuteSelectedMatrix() {
+        writeSelectedBusMute(active: false)
     }
 
-    private func writeSelectedMatrixMute(active: Bool) {
+    private func writeSelectedBusMute(active: Bool) {
         guard let output = state.selectedOutput else { return }
         do {
-            let address = try matrixMuteAddress(output: output)
+            let address = try busMuteAddress(kind: state.busKind, index: output)
             try link.write(address: address, value: .int32(active ? 1 : 0))
-            if state.notice == .matrixMuteIncomplete || state.notice == .matrixMixIncomplete {
+            if state.notice == .matrixMuteIncomplete || state.notice == .matrixUnmuteIncomplete {
                 state.notice = .none
             }
         } catch {
-            state.notice = active ? .matrixMuteIncomplete : .matrixMixIncomplete
+            state.notice = active ? .matrixMuteIncomplete : .matrixUnmuteIncomplete
         }
     }
 
@@ -214,16 +256,9 @@ public final class PassController: ObservableObject {
             return
         }
         state.latestMagnitude = capture.magnitude
-        if let output = state.selectedOutput {
-            let count = (state.readCounts[output] ?? 0) + 1
-            state.readCounts[output] = count
-            let display = state.outputs.first(where: { $0.index == output })?.displayName ?? ""
-            let name = PassPresenter.capturedTraceName(
-                output: output,
-                displayName: display,
-                readNumber: count
-            )
-            try? reader.captureTransferFunction(as: name)
+        let captureName = state.draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !captureName.isEmpty {
+            try? reader.captureTransferFunction(as: captureName)
         }
         switch delaySuggestion(of: capture) {
         case .none:
@@ -315,15 +350,17 @@ extension PassController {
             return
         }
         let addresses: (delay: String, fineDelay: String)
-        do { addresses = try delayAddresses(output: output) } catch { return }
+        do { addresses = try delayAddresses(kind: state.busKind, index: output) } catch { return }
         let value = OscValue.float32(Float(shown))
         do {
             let restore = try confirmReplace([
                 Replacement(address: addresses.delay, value: value),
                 Replacement(address: addresses.fineDelay, value: value)
             ], link: link)
-            state.outputs[output - 1].delaySnapshot = DelaySnapshot(delay: restore[0].value, fineDelay: restore[1].value)
-            try? outputs.save(state.outputs)
+            withBusRecord(output: output) {
+                $0.delaySnapshot = DelaySnapshot(delay: restore[0].value, fineDelay: restore[1].value)
+            }
+            persistOutputs()
             state.delayWrittenThisPass = true
             state.notice = .none
             remeasureAfterDelay()
@@ -376,8 +413,8 @@ extension PassController {
 extension PassController {
     func setSeededEQSnapshot(_ snapshot: [EqBandSnapshot]) {
         guard let output = state.selectedOutput else { return }
-        state.outputs[output - 1].eqSnapshot = snapshot
-        try? outputs.save(state.outputs)
+        withBusRecord(output: output) { $0.eqSnapshot = snapshot }
+        persistOutputs()
     }
 
     public func confirmEq() {
@@ -396,10 +433,11 @@ extension PassController {
             state.notice = .writeFailedKept
             return
         }
+        let bus = state.busKind
         var items: [Replacement] = []
         for band in writeBands {
             let addresses: (freq: String, gain: String, q: String, on: String)
-            do { addresses = try eqAddresses(output: output, band: band.index) } catch { return }
+            do { addresses = try eqAddresses(kind: bus, index: output, band: band.index) } catch { return }
             items.append(Replacement(address: addresses.freq, value: .float32(Float(band.hz))))
             items.append(Replacement(address: addresses.gain, value: .float32(Float(band.gainDb))))
             items.append(Replacement(address: addresses.q, value: .float32(Float(band.q))))
@@ -418,8 +456,8 @@ extension PassController {
                     on: restore[base + 3].value
                 ))
             }
-            state.outputs[output - 1].eqSnapshot = snapshots
-            try? outputs.save(state.outputs)
+            withBusRecord(output: output) { $0.eqSnapshot = snapshots }
+            persistOutputs()
             remeasureAfterEq(output: output)
         } catch let error as ConfirmError {
             state.notice = error == .mismatch ? .writeFailedMismatch : .writeFailedKept
@@ -452,10 +490,12 @@ extension PassController {
     fileprivate func openCompare(output: Int) {
         if let shown = state.displayedDelayMs {
             let count = state.bands?.count ?? 0
-            state.outputs[output - 1].lastWrite = count == 0
-                ? String(format: "%.1f ms · no EQ", shown)
-                : String(format: "%.1f ms · %d bands", shown, count)
-            try? outputs.save(state.outputs)
+            withBusRecord(output: output) {
+                $0.lastWrite = count == 0
+                    ? String(format: "%.1f ms · no EQ", shown)
+                    : String(format: "%.1f ms · %d bands", shown, count)
+            }
+            persistOutputs()
         }
         state.compareOpen = true
         state.step = .compare
@@ -464,9 +504,9 @@ extension PassController {
 
 extension PassController {
     public func undoDelay() {
-        guard let output = state.selectedOutput, let snapshot = state.outputs[output - 1].delaySnapshot else { return }
+        guard let output = state.selectedOutput, let snapshot = busRecord(output: output)?.delaySnapshot else { return }
         let addresses: (delay: String, fineDelay: String)
-        do { addresses = try delayAddresses(output: output) } catch { return }
+        do { addresses = try delayAddresses(kind: state.busKind, index: output) } catch { return }
         sendUndo([
             Replacement(address: addresses.delay, value: snapshot.delay),
             Replacement(address: addresses.fineDelay, value: snapshot.fineDelay)
@@ -474,34 +514,38 @@ extension PassController {
     }
 
     public func undoLastWrite() {
-        guard let output = state.selectedOutput else { return }
-        let lastWrite = state.outputs[output - 1].lastWrite
+        guard let output = state.selectedOutput, let record = busRecord(output: output) else { return }
+        let lastWrite = record.lastWrite
+        let bus = state.busKind
         var items: [Replacement] = []
-        if let snapshot = state.outputs[output - 1].delaySnapshot, let addresses = try? delayAddresses(output: output) {
+        if let snapshot = record.delaySnapshot, let addresses = try? delayAddresses(kind: bus, index: output) {
             items.append(Replacement(address: addresses.delay, value: snapshot.delay))
             items.append(Replacement(address: addresses.fineDelay, value: snapshot.fineDelay))
         }
-        for band in (state.outputs[output - 1].eqSnapshot ?? []).sorted(by: { $0.index < $1.index }) {
-            guard let addresses = try? eqAddresses(output: output, band: band.index) else { continue }
+        for band in (record.eqSnapshot ?? []).sorted(by: { $0.index < $1.index }) {
+            guard let addresses = try? eqAddresses(kind: bus, index: output, band: band.index) else { continue }
             items.append(Replacement(address: addresses.freq, value: band.freq))
             items.append(Replacement(address: addresses.gain, value: band.gain))
             items.append(Replacement(address: addresses.q, value: band.q))
             items.append(Replacement(address: addresses.on, value: band.on))
         }
         sendUndo(items)
-        state.outputs[output - 1].lastWrite = lastWrite
+        withBusRecord(output: output) { $0.lastWrite = lastWrite }
     }
 
     fileprivate func sendUndo(_ items: [Replacement]) {
-        let snapshots = state.outputs
+        let matrixSnap = state.outputs
+        let mixSnap = state.mixOutputs
         do {
             try writeOnly(items, link: link)
             state.notice = .none
         } catch let error as ConfirmError {
-            state.outputs = snapshots
+            state.outputs = matrixSnap
+            state.mixOutputs = mixSnap
             state.notice = error == .mismatch ? .writeFailedMismatch : .writeFailedKept
         } catch {
-            state.outputs = snapshots
+            state.outputs = matrixSnap
+            state.mixOutputs = mixSnap
             state.notice = .writeFailedKept
         }
     }

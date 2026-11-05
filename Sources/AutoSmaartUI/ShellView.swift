@@ -38,7 +38,7 @@ public struct ShellView: View {
             }
             Spacer()
             QuietButton(title: PassPresenter.settings) { openSettings() }
-            QuietButton(title: PassPresenter.mix) { controller.mixSelectedMatrix() }
+            QuietButton(title: PassPresenter.unmute) { controller.unmuteSelectedMatrix() }
             QuietButton(title: PassPresenter.mute) { controller.muteSelectedMatrix() }
             QuietButton(title: PassPresenter.start) { controller.startGenerator() }
             QuietButton(title: PassPresenter.stop) { controller.stop() }
@@ -49,7 +49,7 @@ public struct ShellView: View {
 
     private var selectors: some View {
         HStack(alignment: .top, spacing: ThemeMetrics.groupGap) {
-            selector(kicker: "Matrix", title: matrixTitle) { openMatrix() }
+            selector(kicker: controller.state.busKind.label, title: busTitle) { openMatrix() }
             selector(kicker: "EQ", title: presetTitle) { openPreset() }
         }
         .padding(.horizontal, ThemeMetrics.pagePadding)
@@ -155,9 +155,11 @@ public struct ShellView: View {
             .onTapGesture(perform: close)
     }
 
-    private var matrixTitle: String {
-        if let index = controller.state.selectedOutput { return "Matrix \(index)" }
-        return "Matrix"
+    private var busTitle: String {
+        if let index = controller.state.selectedOutput {
+            return PassPresenter.busLabel(kind: controller.state.busKind, index: index)
+        }
+        return controller.state.busKind.label
     }
 
     private var presetTitle: String {
@@ -170,10 +172,7 @@ public struct ShellView: View {
     }
 
     private var previousDelay: String {
-        let snapshot = controller.state.selectedOutput.flatMap { index in
-            controller.state.outputs.indices.contains(index - 1) ? controller.state.outputs[index - 1].delaySnapshot : nil
-        }
-        return PassPresenter.previousDelayLine(snapshot: snapshot)
+        PassPresenter.previousDelayLine(snapshot: PassPresenter.selectedBusRecord(controller.state)?.delaySnapshot)
     }
 
     private var eqLine: String {
@@ -184,29 +183,52 @@ public struct ShellView: View {
 
     private var matrixPopover: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(1...12, id: \.self) { index in
-                Button {
-                    controller.selectOutput(index)
-                    controller.matrixPickerOpen = false
-                } label: {
-                    HStack {
-                        Text("Matrix \(index)")
-                        Spacer()
-                        if controller.state.selectedOutput == index {
-                            Image(systemName: "checkmark").foregroundStyle(Theme.gold).font(.system(size: 11))
-                        }
+            HStack(spacing: 0) {
+                ForEach(CalibrationBusKind.allCases, id: \.self) { kind in
+                    Button {
+                        let index = controller.state.selectedOutput
+                            .map { min(max($0, kind.indexRange.lowerBound), kind.indexRange.upperBound) }
+                            ?? kind.indexRange.lowerBound
+                        controller.selectBus(kind: kind, index: index)
+                    } label: {
+                        Text(kind.label)
+                            .font(.custom("Inter", size: 13).weight(.medium))
+                            .foregroundStyle(controller.state.busKind == kind ? Theme.text : Theme.secondary)
+                            .frame(maxWidth: .infinity, minHeight: ThemeMetrics.row)
+                            .background(controller.state.busKind == kind ? Theme.selectedRow : Color.clear)
                     }
-                    .font(.custom("Inter", size: 13))
-                    .foregroundStyle(Theme.text)
-                    .frame(height: ThemeMetrics.row)
-                    .padding(.horizontal, 12)
-                    .background(controller.state.selectedOutput == index ? Theme.selectedRow : Color.clear)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .overlay(Rectangle().stroke(Theme.stroke))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(controller.state.busKind.indexRange), id: \.self) { index in
+                        Button {
+                            controller.selectBus(kind: controller.state.busKind, index: index)
+                            controller.matrixPickerOpen = false
+                        } label: {
+                            HStack {
+                                Text(PassPresenter.busLabel(kind: controller.state.busKind, index: index))
+                                Spacer()
+                                if controller.state.selectedOutput == index {
+                                    Image(systemName: "checkmark").foregroundStyle(Theme.gold).font(.system(size: 11))
+                                }
+                            }
+                            .font(.custom("Inter", size: 13))
+                            .foregroundStyle(Theme.text)
+                            .frame(height: ThemeMetrics.row)
+                            .padding(.horizontal, 12)
+                            .background(controller.state.selectedOutput == index ? Theme.selectedRow : Color.clear)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxHeight: 320)
         }
         .padding(.vertical, 8)
-        .frame(width: 240)
+        .frame(width: 260)
         .background(Theme.background)
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.stroke))
     }

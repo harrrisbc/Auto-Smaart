@@ -40,26 +40,56 @@ public struct MatrixOutputRecord: Equatable, Codable {
     }
 }
 
+private struct StoredBusOutputs: Codable {
+    var matrix: [MatrixOutputRecord]
+    var mix: [MatrixOutputRecord]
+}
+
 public final class OutputStore {
     private let fileURL: URL
     public private(set) var outputs: [MatrixOutputRecord]
+    public private(set) var mixOutputs: [MatrixOutputRecord]
 
     public init(fileURL: URL) {
         self.fileURL = fileURL
         if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode([MatrixOutputRecord].self, from: data),
-           decoded.count == 12 {
+           let bundled = try? JSONDecoder().decode(StoredBusOutputs.self, from: data),
+           bundled.matrix.count == 12, bundled.mix.count == 24 {
+            outputs = bundled.matrix
+            mixOutputs = bundled.mix
+        } else if let data = try? Data(contentsOf: fileURL),
+                  let decoded = try? JSONDecoder().decode([MatrixOutputRecord].self, from: data),
+                  decoded.count == 12 {
             outputs = decoded
+            mixOutputs = Self.blankMix()
         } else {
-            outputs = (1...12).map {
-                MatrixOutputRecord(index: $0, displayName: "", lastWrite: nil, delaySnapshot: nil, eqSnapshot: nil)
-            }
+            outputs = Self.blankMatrix()
+            mixOutputs = Self.blankMix()
         }
     }
 
-    public func save(_ outputs: [MatrixOutputRecord]) throws {
-        self.outputs = outputs
+    public func save(matrix: [MatrixOutputRecord], mix: [MatrixOutputRecord]) throws {
+        outputs = matrix
+        mixOutputs = mix
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(outputs).write(to: fileURL, options: .atomic)
+        let payload = StoredBusOutputs(matrix: matrix, mix: mix)
+        try JSONEncoder().encode(payload).write(to: fileURL, options: .atomic)
+    }
+
+    /// Compatibility for matrix-only callers.
+    public func save(_ outputs: [MatrixOutputRecord]) throws {
+        try save(matrix: outputs, mix: mixOutputs)
+    }
+
+    private static func blankMatrix() -> [MatrixOutputRecord] {
+        (1...12).map {
+            MatrixOutputRecord(index: $0, displayName: "", lastWrite: nil, delaySnapshot: nil, eqSnapshot: nil)
+        }
+    }
+
+    private static func blankMix() -> [MatrixOutputRecord] {
+        (1...24).map {
+            MatrixOutputRecord(index: $0, displayName: "", lastWrite: nil, delaySnapshot: nil, eqSnapshot: nil)
+        }
     }
 }

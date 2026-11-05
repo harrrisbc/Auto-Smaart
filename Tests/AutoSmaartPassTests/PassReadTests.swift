@@ -134,33 +134,28 @@ final class PassReadTests: XCTestCase {
         XCTAssertEqual(pass.state.notice, .writeFailedKept)
     }
 
-    func testReadCapturesTransferFunctionNamedByChannelAndCount() throws {
+    func testReadCapturesTransferFunctionUsingDraftName() throws {
         let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
         let (pass, reader, _, _) = makePass(traces: [
             capture(magnitude: [point], finder: 4),
-            capture(magnitude: [point], finder: 5),
-            capture(magnitude: [point], finder: 6)
+            capture(magnitude: [point], finder: 5)
         ])
         try prepare(pass, points: [point])
-        pass.setDisplayName("Subs", output: 1)
+        pass.setDraftName("FOH A")
         pass.readTrace()
-        XCTAssertEqual(reader.capturedTraceNames, ["Subs 1"])
-        XCTAssertEqual(pass.state.readCounts[1], 1)
+        XCTAssertEqual(reader.capturedTraceNames, ["FOH A"])
+        pass.setDraftName("FOH B")
         pass.readTrace()
-        XCTAssertEqual(reader.capturedTraceNames, ["Subs 1", "Subs 2"])
-        XCTAssertEqual(pass.state.readCounts[1], 2)
-        pass.selectOutput(2)
-        pass.readTrace()
-        XCTAssertEqual(reader.capturedTraceNames, ["Subs 1", "Subs 2", "Matrix 2 1"])
-        XCTAssertEqual(pass.state.readCounts[2], 1)
+        XCTAssertEqual(reader.capturedTraceNames, ["FOH A", "FOH B"])
     }
 
-    func testReadCaptureUsesMatrixLabelWhenDisplayNameBlank() throws {
+    func testReadWithoutDraftNameDoesNotAutoRenameCapture() throws {
         let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
         let (pass, reader, _, _) = makePass(traces: [capture(magnitude: [point], finder: 4)])
         try prepare(pass, points: [point])
+        pass.setDraftName("   ")
         pass.readTrace()
-        XCTAssertEqual(reader.capturedTraceNames, ["Matrix 1 1"])
+        XCTAssertTrue(reader.capturedTraceNames.isEmpty)
     }
 
     func testStopAndStartToggleSignalGeneratorWithoutClosingSession() throws {
@@ -180,22 +175,22 @@ final class PassReadTests: XCTestCase {
         XCTAssertTrue(reader.isSessionOpen)
     }
 
-    func testMuteAndMixTargetOnlySelectedMatrix() throws {
+    func testMuteAndUnmuteTargetSelectedMixOrMatrix() throws {
         let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
         let (pass, _, link, _) = makePass(traces: [capture(magnitude: [point], finder: 4)])
         try prepare(pass, points: [point])
-        pass.selectOutput(3)
+        pass.selectBus(kind: .matrix, index: 3)
         pass.muteSelectedMatrix()
-        XCTAssertEqual(link.log.count, 1)
-        XCTAssertEqual(link.log[0].op, "write")
-        XCTAssertEqual(link.log[0].address, try matrixMuteAddress(output: 3))
+        XCTAssertEqual(link.log[0].address, try busMuteAddress(kind: .matrix, index: 3))
         XCTAssertEqual(link.log[0].value, .int32(1))
-        pass.mixSelectedMatrix()
-        XCTAssertEqual(link.log.count, 2)
-        XCTAssertEqual(link.log[1].address, try matrixMuteAddress(output: 3))
+        pass.unmuteSelectedMatrix()
+        XCTAssertEqual(link.log[1].address, try busMuteAddress(kind: .matrix, index: 3))
         XCTAssertEqual(link.log[1].value, .int32(0))
+        pass.selectBus(kind: .mix, index: 5)
+        pass.muteSelectedMatrix()
+        XCTAssertEqual(link.log[2].address, try busMuteAddress(kind: .mix, index: 5))
+        XCTAssertEqual(link.log.filter { $0.address.hasSuffix("/mute") }.count, 3)
         XCTAssertFalse(link.log.contains { $0.address.contains("Input_Channels") })
-        XCTAssertEqual(link.log.filter { $0.address.hasSuffix("/mute") }.count, 2)
     }
 
     func testNoTargetCurveNotice() {
