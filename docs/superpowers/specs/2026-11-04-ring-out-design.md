@@ -72,7 +72,7 @@ The page has four regions:
 
 **Bottom.** The RTA from 100 Hz to 8 kHz. The trace is the live official-API magnitude for bins in that span. Bins outside the span are not drawn. The trace uses the design-system live color. Each written cut is a mark in a second color, the design-system gold, at that notch’s frequency. A deeper cut on the same frequency stays one mark. There is no notch table on the page.
 
-While the loop is running, the top-right control is locked and the popup cannot change the target or the EQ destination. Leaving Ring Out for Calibration is refused until the loop is idle or Stop has finished muting.
+While the loop is running, the top-right control is locked and the popup cannot change the target or the EQ destination. When the loop is idle, that same popup can return to Calibration. Returning is refused while the loop runs, and until Stop has finished muting.
 
 ## Inputs
 
