@@ -38,6 +38,7 @@ public struct ShellView: View {
             }
             Spacer()
             QuietButton(title: PassPresenter.settings) { openSettings() }
+            QuietButton(title: PassPresenter.start) { controller.startGenerator() }
             QuietButton(title: PassPresenter.stop) { controller.stop() }
         }
         .padding(.horizontal, ThemeMetrics.pagePadding)

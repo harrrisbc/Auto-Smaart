@@ -32,6 +32,7 @@ final class PresenterTests: XCTestCase {
         XCTAssertEqual(PassPresenter.smaartLabel, "Smaart API")
         XCTAssertEqual(PassPresenter.readTrace, "Read")
         XCTAssertEqual(PassPresenter.stop, "Stop")
+        XCTAssertEqual(PassPresenter.start, "Start")
         XCTAssertEqual(PassPresenter.smaartConnectionLine(live: true), "Smaart connected")
         XCTAssertEqual(PassPresenter.smaartConnectionLine(live: false), "Smaart not connected")
         XCTAssertEqual(PassPresenter.storeTarget, "Store target")

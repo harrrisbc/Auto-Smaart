@@ -148,10 +148,24 @@ public final class PassController: ObservableObject {
         }
     }
 
+    /// Turns the Smaart signal generator output off. Leaves the TF measurement running.
     public func stop() {
-        reader.closeSession()
-        state.smaartLive = false
-        clearPassProgress()
+        if !reader.isSessionOpen {
+            try? reader.openSession()
+            refreshSessionFlag()
+        }
+        guard reader.isSessionOpen else { return }
+        try? reader.setSignalGeneratorActive(false)
+    }
+
+    /// Turns the Smaart signal generator output back on so the pass can continue.
+    public func startGenerator() {
+        if !reader.isSessionOpen {
+            try? reader.openSession()
+            refreshSessionFlag()
+        }
+        guard reader.isSessionOpen else { return }
+        try? reader.setSignalGeneratorActive(true)
     }
 
     public func readTrace() {

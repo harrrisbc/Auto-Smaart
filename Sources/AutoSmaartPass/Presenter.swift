@@ -14,6 +14,7 @@ public enum PassPresenter {
     public static let smaartLabel = "Smaart API"
     public static let readTrace = "Read"
     public static let stop = "Stop"
+    public static let start = "Start"
     public static let settings = "Settings"
     public static let storeTarget = "Store target"
     public static let storeTrace = "Store trace"

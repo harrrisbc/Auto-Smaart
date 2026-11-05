@@ -133,6 +133,23 @@ final class PassReadTests: XCTestCase {
         XCTAssertEqual(pass.state.notice, .writeFailedKept)
     }
 
+    func testStopAndStartToggleSignalGeneratorWithoutClosingSession() throws {
+        let point = MagnitudePoint(hz: 200, db: 0, phase: 0)
+        let (pass, reader, link, _) = makePass(traces: [capture(magnitude: [point], finder: 4)])
+        try prepare(pass, points: [point])
+        pass.readTrace()
+        XCTAssertEqual(pass.state.step, .delay)
+        XCTAssertTrue(reader.isSessionOpen)
+        pass.stop()
+        XCTAssertEqual(reader.generatorActiveLog, [false])
+        XCTAssertTrue(reader.isSessionOpen)
+        XCTAssertEqual(pass.state.step, .delay)
+        XCTAssertTrue(link.log.isEmpty)
+        pass.startGenerator()
+        XCTAssertEqual(reader.generatorActiveLog, [false, true])
+        XCTAssertTrue(reader.isSessionOpen)
+    }
+
     func testNoTargetCurveNotice() {
         let (pass, _, _, _) = makePass(traces: [])
         pass.setDraftName("Missing")

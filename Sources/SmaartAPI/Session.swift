@@ -17,6 +17,8 @@ public protocol SmaartReader: AnyObject {
     var preferredMeasurementName: String { get set }
     func readTrace() throws -> SmaartCapture
     func readTargetCurve() throws -> [MagnitudePoint]
+    /// Turns the Smaart signal generator output on or off. Does not stop TF engines.
+    func setSignalGeneratorActive(_ active: Bool) throws
 }
 
 public protocol SmaartWire: AnyObject {
@@ -180,6 +182,16 @@ public final class OfficialSmaartSession: SmaartReader {
         }
         if points.isEmpty { throw SmaartReaderError.noTarget }
         return points
+    }
+
+    public func setSignalGeneratorActive(_ active: Bool) throws {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        let reply = try request([
+            "action": "set",
+            "target": "signalGenerator",
+            "properties": [["active": active]]
+        ])
+        if reply["error"] != nil { throw SmaartReaderError.sessionClosed }
     }
 
     private func request(_ payload: [String: Any]) throws -> [String: Any] {
