@@ -213,6 +213,29 @@ final class SessionTests: XCTestCase {
             "properties": .array([.object(["active": .bool(true)])])
         ]))
     }
+
+    func testCaptureTransferFunctionThenRenames() throws {
+        let measurements = #"{"transferFunctionMeasurements":[{"measurementName":"TF","active":true}]}"#
+        let wire = ScriptedWire(replies: [
+            measurements,
+            measurements,
+            #"{"traceFilePath":"/tmp/capture.trf"}"#,
+            #"{}"#
+        ])
+        let session = OfficialSmaartSession(wire: wire)
+        try session.openSession()
+        try session.captureTransferFunction(as: "Matrix 1 1")
+        let sent = try wire.sent.map { try JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }
+        XCTAssertEqual(sent[2], JSONValue.object([
+            "action": .string("capture"),
+            "target": .object(["measurementName": .string("TF")])
+        ]))
+        XCTAssertEqual(sent[3], JSONValue.object([
+            "action": .string("set"),
+            "target": .object(["traceFilePath": .string("/tmp/capture.trf")]),
+            "properties": .array([.object(["name": .string("Matrix 1 1")])])
+        ]))
+    }
 }
 
 enum JSONValue: Equatable {

@@ -19,6 +19,8 @@ public protocol SmaartReader: AnyObject {
     func readTargetCurve() throws -> [MagnitudePoint]
     /// Turns the Smaart signal generator output on or off. Does not stop TF engines.
     func setSignalGeneratorActive(_ active: Bool) throws
+    /// Captures the preferred/active TF into Smaart's data library and renames it.
+    func captureTransferFunction(as name: String) throws
 }
 
 public protocol SmaartWire: AnyObject {
@@ -192,6 +194,49 @@ public final class OfficialSmaartSession: SmaartReader {
             "properties": [["active": active]]
         ])
         if reply["error"] != nil { throw SmaartReaderError.sessionClosed }
+    }
+
+    public func captureTransferFunction(as name: String) throws {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw SmaartReaderError.noTrace }
+        let measurementName = try resolveTransferFunctionName()
+        let captureReply = try request([
+            "action": "capture",
+            "target": ["measurementName": measurementName]
+        ])
+        if captureReply["error"] != nil { throw SmaartReaderError.noTrace }
+        guard let path = traceFilePath(from: captureReply) else { throw SmaartReaderError.noTrace }
+        let renameReply = try request([
+            "action": "set",
+            "target": ["traceFilePath": path],
+            "properties": [["name": trimmed]]
+        ])
+        if renameReply["error"] != nil { throw SmaartReaderError.noTrace }
+    }
+
+    private func resolveTransferFunctionName() throws -> String {
+        let measurements = try request(["action": "get", "target": "measurements"])
+        let rows = measurements["transferFunctionMeasurements"] as? [[String: Any]] ?? []
+        let preferred = preferredMeasurementName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !preferred.isEmpty {
+            guard rows.contains(where: { ($0["measurementName"] as? String) == preferred }) else {
+                throw SmaartReaderError.noTrace
+            }
+            return preferred
+        }
+        guard let name = rows.first(where: { isActiveFlag($0["active"]) })?["measurementName"] as? String
+                ?? rows.first(where: { ($0["measurementName"] as? String)?.isEmpty == false })?["measurementName"] as? String
+        else {
+            throw SmaartReaderError.noTrace
+        }
+        return name
+    }
+
+    private func traceFilePath(from reply: [String: Any]) -> String? {
+        if let path = reply["traceFilePath"] as? String, !path.isEmpty { return path }
+        let files = reply["traceFiles"] as? [[String: Any]] ?? []
+        return files.last.flatMap { $0["traceFilePath"] as? String }.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     private func request(_ payload: [String: Any]) throws -> [String: Any] {
