@@ -7,6 +7,7 @@ public enum SmaartReaderError: Error, Equatable {
     case noTrace
     case noTarget
     case sessionClosed
+    case noRTA
 }
 
 public protocol SmaartReader: AnyObject {
@@ -17,6 +18,8 @@ public protocol SmaartReader: AnyObject {
     var preferredMeasurementName: String { get set }
     func readTrace() throws -> SmaartCapture
     func readTargetCurve() throws -> [MagnitudePoint]
+    func hasActiveRTA() throws -> Bool
+    func readRTA() throws -> [MagnitudePoint]
 }
 
 public protocol SmaartWire: AnyObject {
@@ -83,9 +86,16 @@ public final class URLSessionSmaartWire: SmaartWire {
 }
 
 public final class OfficialSmaartSession: SmaartReader {
+    private enum SpectrumCache {
+        case unknown
+        case none
+        case name(String)
+    }
+
     private let wire: SmaartWire
     public private(set) var isSessionOpen = false
     public var preferredMeasurementName = ""
+    private var spectrumCache: SpectrumCache = .unknown
 
     public init(wire: SmaartWire) { self.wire = wire }
 
@@ -106,11 +116,13 @@ public final class OfficialSmaartSession: SmaartReader {
             throw SmaartReaderError.sessionClosed
         }
         isSessionOpen = true
+        spectrumCache = .unknown
     }
 
     public func closeSession() {
         wire.close()
         isSessionOpen = false
+        spectrumCache = .unknown
     }
 
     public func readTrace() throws -> SmaartCapture {
@@ -180,6 +192,41 @@ public final class OfficialSmaartSession: SmaartReader {
         }
         if points.isEmpty { throw SmaartReaderError.noTarget }
         return points
+    }
+
+    public func hasActiveRTA() throws -> Bool {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        if let name = try fetchActiveSpectrumName() {
+            spectrumCache = .name(name)
+            return true
+        }
+        spectrumCache = .none
+        return false
+    }
+
+    public func readRTA() throws -> [MagnitudePoint] {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        let name: String
+        switch spectrumCache {
+        case .name(let cached):
+            name = cached
+        case .none:
+            throw SmaartReaderError.noRTA
+        case .unknown:
+            guard let fetched = try fetchActiveSpectrumName() else { throw SmaartReaderError.noRTA }
+            spectrumCache = .name(fetched)
+            name = fetched
+        }
+        let body = try request(["action": "get", "target": ["measurementName": name]])
+        let magnitude = magnitudePoints(body["magnitude"] as? [[String: Any]] ?? [])
+        if magnitude.isEmpty { throw SmaartReaderError.noRTA }
+        return magnitude
+    }
+
+    private func fetchActiveSpectrumName() throws -> String? {
+        let measurements = try request(["action": "get", "target": "measurements"])
+        let rows = measurements["spectrumMeasurements"] as? [[String: Any]] ?? []
+        return rows.first(where: { isActiveFlag($0["active"]) })?["measurementName"] as? String
     }
 
     private func request(_ payload: [String: Any]) throws -> [String: Any] {

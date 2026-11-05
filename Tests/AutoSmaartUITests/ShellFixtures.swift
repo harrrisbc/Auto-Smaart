@@ -30,6 +30,16 @@ final class ScriptedReader: SmaartReader {
         guard let target, !target.isEmpty else { throw SmaartReaderError.noTarget }
         return target
     }
+
+    func hasActiveRTA() throws -> Bool {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        return false
+    }
+
+    func readRTA() throws -> [MagnitudePoint] {
+        guard isSessionOpen else { throw SmaartReaderError.sessionClosed }
+        throw SmaartReaderError.noRTA
+    }
 }
 
 final class RecordingLink: OscLink {
