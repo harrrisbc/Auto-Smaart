@@ -21,12 +21,14 @@ final class BuiltInTargetsTests: XCTestCase {
         let speech1k = speech.first { $0.hz == 1000 }?.db ?? 99
         let speech8k = speech.first { $0.hz == 8000 }?.db ?? 99
         let speech16k = speech.first { $0.hz == 16000 }?.db ?? 99
-        XCTAssertEqual(speech50, speech125, accuracy: 1e-9, "no target gap below the fit band")
-        XCTAssertLessThan(abs(speech1k - speech125), 1, "Speech stays flatter 125 Hz–8 kHz")
-        XCTAssertLessThan(abs(speech8k - speech1k), 1)
-        XCTAssertEqual(speech16k, speech8k, accuracy: 1e-9, "no target gap in the top octave")
+        XCTAssertEqual(speech50, speech125, accuracy: 1e-9, "no steep target scoop below the fit band")
+        XCTAssertLessThan(abs(speech1k - speech125), 1, "mids stay calm before the gentle HF rise")
+        XCTAssertGreaterThan(speech8k - speech1k, 1.5, "Speech needs a visible gentle high rise")
+        XCTAssertLessThan(speech8k - speech1k, 5, "not the old steep HF tilt")
+        XCTAssertEqual(speech16k, speech8k, accuracy: 1e-9, "top octave holds the 8 kHz edge")
 
         let music = BuiltInTargets.presets[2].points
+        XCTAssertLessThan(speech50, music.first { $0.hz == 50 }?.db ?? -99, "Speech low end lighter than Music")
         XCTAssertGreaterThan(music.first { $0.hz == 50 }?.db ?? 0, 2)
         XCTAssertLessThan(music.first { $0.hz == 50 }?.db ?? 99, 6, "a few dB shelf, not a huge tilt")
         XCTAssertLessThan(abs(music.first { $0.hz == 1000 }?.db ?? 99), 0.5)

@@ -35,13 +35,18 @@ public enum BuiltInTargets {
         0.15 * sin(log2(max(hz, 20) / 500) * .pi)
     }
 
-    /// Speech: flatter through 125 Hz–8 kHz. No drawn gap outside the fit band —
-    /// below 125 Hz and above 8 kHz hold the band-edge level so ignored regions
-    /// do not look like an EQ error.
+    /// Speech: low end lighter than Music (no LF shelf), held flat below 125 Hz
+    /// so the fitter does not chase the ignored region. Gentle presence rise
+    /// through the highs inside 1–8 kHz — visible on the thumbnail, not the old
+    /// steep HF tilt. Above 8 kHz hold the edge so the top octave stays ignored.
     private static func speech(_ hz: Double) -> Double {
         if hz < 125 { return speech(125) }
+        let midRipple = 0.1 * sin(log2(max(hz, 125) / 500) * .pi)
+        if hz < 1000 { return midRipple }
         if hz <= 8000 {
-            return 0.1 * sin(log2(hz / 500) * .pi)
+            // ~+2.5 dB by 8 kHz — enough to read on the plot, not a steep chase.
+            let octaves = log2(hz / 1000)
+            return midRipple + 0.85 * octaves
         }
         return speech(8000)
     }
