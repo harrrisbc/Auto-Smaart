@@ -12,9 +12,10 @@ let package = Package(
         .target(name: "SmaartAPI", dependencies: ["AutoSmaartCore"]),
         .target(name: "ConsoleOSC", dependencies: ["AutoSmaartCore"]),
         .target(name: "AutoSmaartPass", dependencies: ["AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]),
+        .target(name: "AutoSmaartRingOut", dependencies: ["AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]),
         .target(
             name: "AutoSmaartUI",
-            dependencies: ["AutoSmaartPass", "AutoSmaartCore", "SmaartAPI", "ConsoleOSC"],
+            dependencies: ["AutoSmaartPass", "AutoSmaartRingOut", "AutoSmaartCore", "SmaartAPI", "ConsoleOSC"],
             resources: [.process("Resources")]
         ),
         .executableTarget(
@@ -37,7 +38,10 @@ let package = Package(
             name: "AutoSmaartCoreTests",
             dependencies: ["AutoSmaartCore"],
             path: "Tests",
-            exclude: ["SmaartAPITests", "ConsoleOSCTests", "HardwareTests", "AutoSmaartPassTests", "AutoSmaartUITests"],
+            exclude: [
+                "SmaartAPITests", "ConsoleOSCTests", "HardwareTests",
+                "AutoSmaartPassTests", "AutoSmaartUITests", "AutoSmaartRingOutTests"
+            ],
             sources: ["AutoSmaartCoreTests"],
             resources: [.process("Fixtures")]
         ),
@@ -47,14 +51,24 @@ let package = Package(
             name: "AutoSmaartPassTests",
             dependencies: ["AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"],
             path: "Tests",
-            exclude: ["AutoSmaartCoreTests", "SmaartAPITests", "ConsoleOSCTests", "HardwareTests", "AutoSmaartUITests"],
+            exclude: [
+                "AutoSmaartCoreTests", "SmaartAPITests", "ConsoleOSCTests",
+                "HardwareTests", "AutoSmaartUITests", "AutoSmaartRingOutTests"
+            ],
             sources: ["AutoSmaartPassTests"],
             resources: [.process("Fixtures")]
         ),
         .testTarget(
-            name: "AutoSmaartUITests",
-            dependencies: ["AutoSmaartUI", "AutoSmaartPass", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]
+            name: "AutoSmaartRingOutTests",
+            dependencies: ["AutoSmaartRingOut", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]
         ),
-        .testTarget(name: "HardwareTests", dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC", "AutoSmaartPass"])
+        .testTarget(
+            name: "AutoSmaartUITests",
+            dependencies: ["AutoSmaartUI", "AutoSmaartPass", "AutoSmaartRingOut", "AutoSmaartCore", "ConsoleOSC", "SmaartAPI"]
+        ),
+        .testTarget(
+            name: "HardwareTests",
+            dependencies: ["AutoSmaartCore", "SmaartAPI", "ConsoleOSC", "AutoSmaartPass", "AutoSmaartRingOut"]
+        )
     ]
 )
