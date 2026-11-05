@@ -89,7 +89,11 @@ public enum PassPresenter {
     public static func frequencyCell(_ band: EqBand?) -> String {
         guard let band else { return emDash }
         let freq = formatFrequency(band.hz)
-        return band.shape == .lowShelf ? "Shelf · \(freq)" : freq
+        switch band.shape {
+        case .lowShelf: return "LF shelf · \(freq)"
+        case .highShelf: return "HF shelf · \(freq)"
+        case .peaking: return freq
+        }
     }
 
     public static func gainCell(_ band: EqBand?) -> String {
@@ -101,8 +105,10 @@ public enum PassPresenter {
 
     public static func qCell(_ band: EqBand?) -> String {
         guard let band else { return emDash }
-        if band.shape == .lowShelf { return "shelf" }
-        return String(format: "%.2f", band.q)
+        switch band.shape {
+        case .lowShelf, .highShelf: return "shelf"
+        case .peaking: return String(format: "%.2f", band.q)
+        }
     }
 
     public static func suggestedDelay(_ displayed: Double) -> String {
