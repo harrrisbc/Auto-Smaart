@@ -9,7 +9,7 @@ public func displayedDelayMs(_ rawMilliseconds: Double) -> Double {
     roundHalfAwayFromZero(rawMilliseconds, places: 1)
 }
 
-func delaySuggestion(of capture: SmaartCapture) -> DelaySuggestion {
+public func delaySuggestion(of capture: SmaartCapture) -> DelaySuggestion {
     if let finder = capture.delayFinderMs {
         return .milliseconds(finder)
     }
