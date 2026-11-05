@@ -40,7 +40,7 @@ final class ShellTests: XCTestCase {
         XCTAssertTrue(pass.state.presets.map(\.name).contains("Flat"))
         XCTAssertTrue(pass.state.presets.map(\.name).contains("Haystack"))
         pass.readTrace()
-        let shell = ShellView(controller: pass)
+        let shell = CalibrationShell(controller: pass)
         _ = shell.body
         pass.matrixPickerOpen = true
         _ = shell.body

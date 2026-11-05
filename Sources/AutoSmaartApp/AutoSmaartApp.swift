@@ -15,8 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ProcessInfo.processInfo.disableSuddenTermination()
         ProcessInfo.processInfo.disableAutomaticTermination("Auto-Smaart window")
         NSApp.activate(ignoringOtherApps: true)
-        // Bare SPM binaries are often culled once the launcher shell goes away unless
-        // they are opened as a real .app. Keep the Window scene from evaporating.
         DispatchQueue.main.async {
             for window in NSApp.windows {
                 window.isReleasedWhenClosed = false
@@ -43,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct AutoSmaartApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var mode: AppMode = .calibration
 
     init() {
         signal(SIGHUP, SIG_IGN)
@@ -50,13 +49,19 @@ struct AutoSmaartApp: App {
     }
 
     var body: some Scene {
-        // Single Window avoids WindowGroup spawning extra off-screen scenes that then vanish.
         Window("Auto-Smaart", id: "main") {
-            ShellView(controller: AppRuntime.controller)
-                .onAppear {
-                    AppRuntime.controller.refreshSessionFlag()
-                    NSApp.activate(ignoringOtherApps: true)
-                }
+            ShellView(
+                mode: $mode,
+                calibration: AppRuntime.controller,
+                ringOut: AppRuntime.ringOut,
+                muteLink: AppRuntime.liveLink
+            )
+            .onAppear {
+                AppRuntime.controller.refreshSessionFlag()
+                AppRuntime.ringOut.updateHost(AppRuntime.box.host)
+                AppRuntime.ringOut.updatePort(AppRuntime.box.port)
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: ThemeMetrics.windowWidth, height: ThemeMetrics.windowHeight)
