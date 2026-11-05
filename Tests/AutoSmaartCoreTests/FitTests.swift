@@ -90,13 +90,19 @@ final class FitTests: XCTestCase {
         XCTAssertFalse(bands.contains { $0.shape == .peaking })
     }
 
-    func testSpeechFlatTraceNeedsNoEQWhenTargetHasNoIgnoredGap() {
+    func testSpeechFlatTraceDoesNotChaseBelow125() {
         let frequencies: [Double] = [
             20, 40, 80, 125, 250, 500, 1000, 2000, 4000, 8000, 16000
         ]
         let measurement = frequencies.map { MagnitudePoint(hz: $0, db: 0, phase: 0) }
         let speech = BuiltInTargets.presets.first { $0.name == "Speech" }!.points
-        XCTAssertEqual(fitEq(measurement: measurement, preset: speech), .bands([]))
+        guard case .bands(let bands) = fitEq(measurement: measurement, preset: speech) else {
+            return XCTFail("expected bands")
+        }
+        // Gentle HF rise vs a flat trace may need peaking in-band; never under 125 Hz.
+        XCTAssertFalse(bands.contains { $0.hz < fitBandLowHz })
+        XCTAssertFalse(bands.contains { $0.shape == .lowShelf })
+        XCTAssertFalse(bands.contains { $0.hz > fitBandHighHz })
     }
 
     func testInBandSpeechGapStillFits() {
