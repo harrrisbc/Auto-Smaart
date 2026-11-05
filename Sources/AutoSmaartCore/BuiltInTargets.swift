@@ -43,15 +43,17 @@ public enum BuiltInTargets {
         return ripple + 1.6 * octaves
     }
 
-    /// Speech: less bass, flatter through the mid / presence band.
+    /// Speech: less bass, then a clear high-frequency rise for presence / intelligibility.
     private static func speech(_ hz: Double) -> Double {
         if hz <= 80 { return -5 }
         if hz < 250 {
             return -5 + 5 * (log(hz / 80) / log(250.0 / 80.0))
         }
-        if hz < 4000 { return 0.2 * sin(log2(hz / 500) * .pi) }
-        // Mild presence, not a loudspeaker "flat" shelf.
-        return 0.5
+        let midRipple = 0.2 * sin(log2(max(hz, 250) / 500) * .pi)
+        if hz < 1000 { return midRipple }
+        // Rising highs: ~+3.5 dB by 8 kHz, ~+4.6 dB by 10 kHz, ~+5.6 dB by 16 kHz.
+        let octaves = log2(hz / 1000)
+        return midRipple + 1.4 * octaves
     }
 
     /// Music: low lift with a gentle downward tilt through the band.
