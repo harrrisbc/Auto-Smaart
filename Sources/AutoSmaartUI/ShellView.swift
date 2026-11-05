@@ -43,8 +43,12 @@ public struct ShellView: View {
                     Color.clear
                 }
             case .ringOut:
-                RingOutPage(controller: ringOut) {
+                RingOutPage(controller: ringOut, calibration: calibration) {
                     guard !ringOut.state.loopLocked else { return }
+                    if let calibration {
+                        ringOut.updateHost(calibration.state.host)
+                        ringOut.updatePort(calibration.state.port)
+                    }
                     mode = .calibration
                 }
                 .frame(width: ThemeMetrics.windowWidth, height: ThemeMetrics.windowHeight)

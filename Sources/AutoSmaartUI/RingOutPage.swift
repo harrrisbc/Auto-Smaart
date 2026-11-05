@@ -2,150 +2,221 @@ import SwiftUI
 import Combine
 import AutoSmaartRingOut
 import AutoSmaartCore
+import AutoSmaartPass
 
 public struct RingOutPage: View {
     @ObservedObject var controller: RingOutController
+    /// Shared calibration pass — Settings host/port live here; Back syncs into Ring Out.
+    var calibration: PassController?
     let onLeave: () -> Void
-    @State private var showPopup = false
+    @State private var settingsOpen = false
 
-    public init(controller: RingOutController, onLeave: @escaping () -> Void) {
+    /// Short on-page strip choices — not the full console map.
+    private let shortCount = 8
+
+    public init(
+        controller: RingOutController,
+        calibration: PassController? = nil,
+        onLeave: @escaping () -> Void
+    ) {
         self.controller = controller
+        self.calibration = calibration
         self.onLeave = onLeave
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(RingOutPresenter.statusText(
-                    rtaLive: controller.state.rtaLive,
-                    notice: controller.state.notice,
-                    host: controller.state.host,
-                    port: controller.state.port
-                ))
-                .font(.custom("Inter", size: 13))
-                .foregroundStyle(Theme.secondary)
-                Spacer()
-                QuietButton(title: RingOutPresenter.stopAction) { controller.stop() }
-            }
-            .frame(height: ThemeMetrics.titleBar)
-            .padding(.horizontal, ThemeMetrics.pagePadding)
+        HStack(spacing: 0) {
+            fullHeightFader
+                .frame(width: 160)
+                .frame(maxHeight: .infinity)
 
-            HStack(alignment: .top, spacing: 20) {
-                fader
-                    .frame(width: 120, height: 280)
-                Spacer()
-                Button {
-                    showPopup = true
-                } label: {
-                    Text(RingOutPresenter.targetLabel(
-                        faderKind: controller.state.faderKind,
-                        faderIndex: controller.state.faderIndex,
-                        eqKind: controller.state.eqKind,
-                        eqIndex: controller.state.eqIndex
-                    ))
-                    .font(.custom("Inter", size: 16).weight(.medium))
-                    .foregroundStyle(Theme.text)
-                    .padding(.horizontal, 14)
-                    .frame(height: 40)
-                    .background(Theme.raised)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.stroke))
-                }
-                .buttonStyle(.plain)
-                .disabled(controller.state.loopLocked)
-                .popover(isPresented: $showPopup) { popup }
+            VStack(spacing: 0) {
+                topBar
+                stripPanel
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1)
+                RTAPlot(points: controller.state.latestRTA, bands: controller.state.bands)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal, ThemeMetrics.pagePadding)
+                    .padding(.bottom, ThemeMetrics.pagePadding)
             }
-            .padding(ThemeMetrics.pagePadding)
-
-            RTAPlot(points: controller.state.latestRTA, bands: controller.state.bands)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, ThemeMetrics.pagePadding)
-                .padding(.bottom, ThemeMetrics.pagePadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.background)
         .foregroundStyle(Theme.text)
+        .overlay { settingsOverlay }
         .onReceive(Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()) { date in
             controller.tick(now: date)
         }
     }
 
-    private var fader: some View {
-        VStack(spacing: 12) {
-            Text(RingOutPresenter.faderCell(controller.state.currentFader))
-                .font(.custom("Inter", size: 22).weight(.semibold))
-                .monospacedDigit()
-            GeometryReader { geo in
-                ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: 4).fill(Theme.raised)
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Theme.live)
-                        .frame(height: geo.size.height * faderFraction(controller.state.currentFader))
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            Text(RingOutPresenter.statusText(
+                rtaLive: controller.state.rtaLive,
+                notice: controller.state.notice,
+                host: controller.state.host,
+                port: controller.state.port
+            ))
+            .font(.custom("Inter", size: 13))
+            .foregroundStyle(Theme.secondary)
+            Spacer()
+            QuietButton(title: PassPresenter.settings) {
+                guard !controller.state.loopLocked else { return }
+                settingsOpen = true
+            }
+            .disabled(controller.state.loopLocked || calibration == nil)
+            QuietButton(title: RingOutPresenter.leaveAction) {
+                guard !controller.state.loopLocked else { return }
+                onLeave()
+            }
+            .disabled(controller.state.loopLocked)
+            QuietButton(title: RingOutPresenter.stopAction) { controller.stop() }
+        }
+        .padding(.horizontal, ThemeMetrics.pagePadding)
+        .frame(height: ThemeMetrics.titleBar)
+    }
+
+    @ViewBuilder
+    private var settingsOverlay: some View {
+        if settingsOpen, let calibration {
+            ZStack {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .onTapGesture { closeSettings(calibration) }
+                VStack(alignment: .leading, spacing: 0) {
+                    SettingsView(controller: calibration)
+                    QuietButton(title: PassPresenter.back) { closeSettings(calibration) }
+                        .padding(.horizontal, ThemeMetrics.pagePadding)
+                        .padding(.bottom, ThemeMetrics.pagePadding)
                 }
+                .frame(width: 440, height: 560)
+                .background(Theme.background)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke))
             }
         }
     }
 
-    private var popup: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func closeSettings(_ calibration: PassController) {
+        settingsOpen = false
+        controller.updateHost(calibration.state.host)
+        controller.updatePort(calibration.state.port)
+    }
+
+    private var fullHeightFader: some View {
+        VStack(spacing: 16) {
+            Text(RingOutPresenter.faderCell(controller.state.currentFader))
+                .font(.custom("Inter", size: 28).weight(.semibold))
+                .monospacedDigit()
+                .padding(.top, ThemeMetrics.pagePadding)
+            GeometryReader { geo in
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 6).fill(Theme.raised)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Theme.live)
+                        .frame(height: max(4, geo.size.height * faderFraction(controller.state.currentFader)))
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, ThemeMetrics.pagePadding)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.raised)
+        .overlay(Rectangle().stroke(Theme.stroke, lineWidth: 1))
+    }
+
+    private var stripPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
             Text(RingOutPresenter.faderTargetHeading)
-                .font(.custom("Inter", size: 11).weight(.medium))
+                .font(.custom("Inter", size: 13).weight(.semibold))
                 .foregroundStyle(Theme.lightGold)
-            kindPicker(
+            kindRow(
+                selected: controller.state.faderKind,
+                set: { controller.selectFader(kind: $0, index: clampedIndex($0, controller.state.faderIndex)) }
+            )
+            indexList(
                 kind: controller.state.faderKind,
-                index: controller.state.faderIndex,
-                set: { controller.selectFader(kind: $0, index: $1) }
+                selected: controller.state.faderIndex,
+                set: { controller.selectFader(kind: controller.state.faderKind, index: $0) }
             )
+
             Text(RingOutPresenter.eqTargetHeading)
-                .font(.custom("Inter", size: 11).weight(.medium))
+                .font(.custom("Inter", size: 13).weight(.semibold))
                 .foregroundStyle(Theme.lightGold)
-            kindPicker(
-                kind: controller.state.eqKind,
-                index: controller.state.eqIndex,
-                set: { controller.selectEQ(kind: $0, index: $1) }
+                .padding(.top, 8)
+            kindRow(
+                selected: controller.state.eqKind,
+                set: { controller.selectEQ(kind: $0, index: clampedIndex($0, controller.state.eqIndex)) }
             )
-            QuietButton(title: RingOutPresenter.startAction) {
-                controller.start()
-                showPopup = false
+            indexList(
+                kind: controller.state.eqKind,
+                selected: controller.state.eqIndex,
+                set: { controller.selectEQ(kind: controller.state.eqKind, index: $0) }
+            )
+
+            HStack(spacing: 12) {
+                QuietButton(title: RingOutPresenter.startAction) { controller.start() }
+                    .disabled(controller.state.loopLocked || controller.state.host.isEmpty || controller.state.port.isEmpty || !controller.state.rtaLive)
+                if controller.state.undoAvailable {
+                    QuietButton(title: RingOutPresenter.undoAction) { controller.undoNotches() }
+                        .disabled(controller.state.loopLocked)
+                }
             }
-            .disabled(controller.state.loopLocked || controller.state.host.isEmpty || controller.state.port.isEmpty || !controller.state.rtaLive)
-            if controller.state.undoAvailable {
-                QuietButton(title: RingOutPresenter.undoAction) { controller.undoNotches() }
-                    .disabled(controller.state.loopLocked)
-            }
-            QuietButton(title: RingOutPresenter.leaveAction, action: onLeave)
-                .disabled(controller.state.loopLocked)
+            .padding(.top, 8)
+
             if controller.state.loopLocked {
                 Text(RingOutPresenter.modeLockNote)
-                    .font(.custom("Inter", size: 11))
+                    .font(.custom("Inter", size: 12))
                     .foregroundStyle(Theme.secondary)
             }
         }
-        .padding(16)
-        .frame(width: 280)
-        .background(Theme.background)
+        .padding(ThemeMetrics.pagePadding)
+        .disabled(controller.state.loopLocked)
     }
 
-    private func kindPicker(kind: StripKind, index: Int, set: @escaping (StripKind, Int) -> Void) -> some View {
-        HStack {
-            Picker(RingOutPresenter.faderTargetHeading, selection: Binding(
-                get: { kind },
-                set: { set($0, stripIndexRange($0).lowerBound) }
-            )) {
-                ForEach(StripKind.allCases, id: \.self) { item in
-                    Text(RingOutPresenter.kindName(item)).tag(item)
+    private func kindRow(selected: StripKind, set: @escaping (StripKind) -> Void) -> some View {
+        HStack(spacing: 10) {
+            ForEach(StripKind.allCases, id: \.self) { kind in
+                Button {
+                    set(kind)
+                } label: {
+                    Text(RingOutPresenter.kindName(kind))
+                        .font(.custom("Inter", size: 16).weight(.medium))
+                        .foregroundStyle(selected == kind ? Theme.text : Theme.secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(selected == kind ? Theme.selectedRow : Theme.raised)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected == kind ? Theme.gold : Theme.stroke))
                 }
+                .buttonStyle(.plain)
             }
-            .labelsHidden()
-            Picker("Index", selection: Binding(
-                get: { index },
-                set: { set(kind, $0) }
-            )) {
-                ForEach(Array(stripIndexRange(kind)), id: \.self) { item in
-                    Text("\(item)").tag(item)
-                }
-            }
-            .labelsHidden()
         }
-        .disabled(controller.state.loopLocked)
+    }
+
+    private func indexList(kind: StripKind, selected: Int, set: @escaping (Int) -> Void) -> some View {
+        let range = stripIndexRange(kind)
+        let indices = Array(range.prefix(shortCount))
+        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 10)], alignment: .leading, spacing: 10) {
+            ForEach(indices, id: \.self) { index in
+                Button {
+                    set(index)
+                } label: {
+                    Text(RingOutPresenter.stripLabel(kind: kind, index: index))
+                        .font(.custom("Inter", size: 15).weight(.medium))
+                        .foregroundStyle(selected == index ? Theme.text : Theme.secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(selected == index ? Theme.selectedRow : Theme.background)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected == index ? Theme.gold : Theme.stroke))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func clampedIndex(_ kind: StripKind, _ index: Int) -> Int {
+        let range = stripIndexRange(kind)
+        return min(max(index, range.lowerBound), min(range.upperBound, range.lowerBound + shortCount - 1))
     }
 
     private func faderFraction(_ level: FaderLevel?) -> CGFloat {

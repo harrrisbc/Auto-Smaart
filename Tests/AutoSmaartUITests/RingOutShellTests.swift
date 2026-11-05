@@ -57,6 +57,8 @@ final class RingOutShellTests: XCTestCase {
         XCTAssertTrue(source.contains("smaartLive") || source.contains("Smaart live"))
         XCTAssertTrue(source.contains("100") && source.contains("8000"))
         XCTAssertTrue(source.contains("leaveAction"))
+        XCTAssertTrue(source.contains("PassPresenter.settings") || source.contains("Settings"))
+        XCTAssertTrue(source.contains("SettingsView"))
         XCTAssertTrue(source.contains("Ring Out"))
         for forbidden in ["RingOutSetupView", "RingOutRunningView", "RingOutNotchView", "RingOutDoneView", "/sd/Input_Channels", "decideNotch", "CGWindowListCreateImage"] {
             XCTAssertFalse(source.contains(forbidden), forbidden)
@@ -72,7 +74,7 @@ final class RingOutShellTests: XCTestCase {
         let controller = RingOutController(smaart: smaart, linkFactory: { _, _ in link })
         controller.updateHost("127.0.0.1")
         controller.updatePort("9000")
-        _ = RingOutPage(controller: controller, onLeave: {}).body
+        _ = RingOutPage(controller: controller, calibration: nil, onLeave: {}).body
         _ = ShellView(mode: .constant(.ringOut), calibration: nil, ringOut: controller).body
     }
 }
