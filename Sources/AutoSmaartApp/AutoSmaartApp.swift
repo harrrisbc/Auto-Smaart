@@ -15,6 +15,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ProcessInfo.processInfo.disableSuddenTermination()
         ProcessInfo.processInfo.disableAutomaticTermination("Auto-Smaart window")
         NSApp.activate(ignoringOtherApps: true)
+        // Bare SPM binaries are often culled once the launcher shell goes away unless
+        // they are opened as a real .app. Keep the Window scene from evaporating.
+        DispatchQueue.main.async {
+            for window in NSApp.windows {
+                window.isReleasedWhenClosed = false
+                window.collectionBehavior.insert(.moveToActiveSpace)
+                window.center()
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
